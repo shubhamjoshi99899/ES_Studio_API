@@ -196,7 +196,10 @@ export class AnalyticsService {
         if (!date) continue;
 
         const rawKey = `${date}|${utmSource}|${utmMedium}|${utmCampaign}|${country}|${city}|${deviceCategory}|${userGender}|${userAge}`;
-        const dimensionHash = crypto.createHash('md5').update(rawKey).digest('hex');
+        const dimensionHash = crypto
+          .createHash('md5')
+          .update(rawKey)
+          .digest('hex');
 
         batch.push({
           dimensionHash,
@@ -233,11 +236,13 @@ export class AnalyticsService {
       totalInserted += batch.length;
     }
 
-    this.logger.log(`Legacy Import Complete. Total inserted/updated: ${totalInserted}`);
+    this.logger.log(
+      `Legacy Import Complete. Total inserted/updated: ${totalInserted}`,
+    );
     return totalInserted;
   }
 
-  @Cron('10 12 * * *', { timeZone: 'Asia/Kolkata' })
+  @Cron('30 13 * * *', { timeZone: 'Asia/Kolkata' })
   async syncYesterdayData() {
     this.logger.log('Starting Daily Analytics Sync from BigQuery Stream...');
 
@@ -247,9 +252,8 @@ export class AnalyticsService {
         country, city, device_category, user_gender, user_age,
         sessions, pageviews, users, new_users, recurring_users, identified_users, event_count, engagement_rate
       FROM \`bigquerytest-486307.analytics_266571177.utm_daily_metrics\`
+      WHERE date >= DATE_SUB(CURRENT_DATE('Asia/Kolkata'), INTERVAL 3 DAY)
     `;
-
-      // WHERE date >= DATE_SUB(CURRENT_DATE('Asia/Kolkata'), INTERVAL 3 DAY)
 
     try {
       const stream = await this.bq.queryStream(query);
