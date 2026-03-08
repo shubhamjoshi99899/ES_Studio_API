@@ -692,18 +692,45 @@ export class AnalyticsController {
       });
       if (!profile) return res.status(404).json({ error: 'Profile not found' });
 
+      // --- SMART GAP DETECTION ---
+      let daysToFetch = body.days;
+      
+      if (!daysToFetch) {
+        const latestSnapshot = await this.snapshotRepo.findOne({
+          where: { profileId },
+          order: { date: 'DESC' },
+        });
+
+        if (latestSnapshot) {
+          const lastDate = new Date(latestSnapshot.date);
+          const today = new Date();
+          const diffTime = Math.abs(today.getTime() - lastDate.getTime());
+          const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+          
+          // Fetch the missing gap + 2 days for overlapping metric updates
+          daysToFetch = diffDays > 0 ? diffDays + 2 : 2; 
+        } else {
+          // Fallback to 90 days if no data exists at all
+          daysToFetch = 90; 
+        }
+      }
+
+      // Cap at 90 days to respect API limits
+      daysToFetch = Math.min(daysToFetch, 90);
+
       await this.profileRepo.update(
         { profileId },
         { syncState: 'SYNCING', lastSyncError: '' },
       );
+      
       await this.syncQueue.add('initial-historical-sync', {
         profileId,
-        daysToFetch: body.days || 30,
+        daysToFetch,
       });
 
       return res
         .status(200)
-        .json({ success: true, message: 'Manual sync started' });
+        .json({ success: true, message: `Manual sync queued for ${daysToFetch} days` });
     } catch (error: any) {
       return res.status(500).json({ error: error.message });
     }
