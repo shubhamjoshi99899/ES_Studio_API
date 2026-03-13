@@ -44,7 +44,4 @@ export class AnalyticsSnapshot {
 
   @Column({ type: 'int', default: 0 })
   netMessages: number;
-
-  @Column({ type: 'jsonb', nullable: true })
-  demographics: any;
 }

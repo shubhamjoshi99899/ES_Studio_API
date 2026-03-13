@@ -540,7 +540,6 @@ export class AnalyticsController {
 
       return res.status(200).json({
         timeSeries,
-        demographics: [],
         totals: {
           currentAudience,
           audienceChange: calcChange(currentAudience, prevAudience).toFixed(1),
