@@ -9,6 +9,11 @@ async function bootstrap() {
   app.use(cookieParser());
   app.use(compression({ threshold: 1024 })); // Compress responses > 1KB
 
+  // Health check — no auth required, used by Docker HEALTHCHECK
+  app.use('/health', (req: any, res: any) => {
+    res.status(200).json({ status: 'ok' });
+  });
+
   app.enableCors({
     origin: process.env.FRONTEND_URL || 'http://localhost:3000',
     credentials: true,
