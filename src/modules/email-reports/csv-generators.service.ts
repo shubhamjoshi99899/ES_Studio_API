@@ -210,10 +210,14 @@ export class CsvGeneratorService {
         const csvRows: string[] = [];
 
         // ── Section 1: Team-wise daily revenue totals ──
+        // Drop teams with zero revenue across the range to match the page-level
+        // filter (no point emitting an all-zeros row).
         csvRows.push(this.joinRow(['Team', ...dateHeaders]));
         const grandDaily = new Array(dates.length).fill(0);
         for (const [team, perDay] of teamDaily) {
             const values = dates.map((d) => Number(perDay.get(d) || 0));
+            const rowSum = values.reduce((a, b) => a + b, 0);
+            if (rowSum <= 0) continue;
             values.forEach((v, i) => { grandDaily[i] += v; });
             csvRows.push(this.joinRow([team, ...values.map((v) => this.fmtMoney(v))]));
         }
@@ -223,12 +227,19 @@ export class CsvGeneratorService {
         csvRows.push('');
 
         // ── Section 2: Page-wise daily revenue with Division + Monetization ──
+        // Only include pages whose total revenue across the range is non-zero —
+        // pages that earned $0 in the period are dropped from the email CSV.
         csvRows.push(this.joinRow(['Pages', 'Division', 'Monetization', ...dateHeaders]));
-        // Sort by team, then page name, for a stable readable order
-        const sortedPages = Array.from(pageDaily.entries()).sort((a, b) => {
-            const ta = (a[1].team || '').localeCompare(b[1].team || '');
-            return ta !== 0 ? ta : a[0].localeCompare(b[0]);
-        });
+        const sortedPages = Array.from(pageDaily.entries())
+            .filter(([, entry]) => {
+                let sum = 0;
+                for (const v of entry.perDay.values()) sum += Number(v) || 0;
+                return sum > 0;
+            })
+            .sort((a, b) => {
+                const ta = (a[1].team || '').localeCompare(b[1].team || '');
+                return ta !== 0 ? ta : a[0].localeCompare(b[0]);
+            });
         for (const [pageName, entry] of sortedPages) {
             const division = divisionByName.get(pageName.trim().toLowerCase()) || '';
             const monetization = ''; // Not tracked in DB yet — column present to match template
