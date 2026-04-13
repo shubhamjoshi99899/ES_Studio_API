@@ -31,261 +31,210 @@ export class CsvGeneratorService {
     ) {}
 
     // ─────────────────────────────────────────────────────
-    // 1. WEB TRAFFIC CSV
+    // 1. WEB TRAFFIC CSV — 7-day daily breakdown, team-wise + page-wise
     // ─────────────────────────────────────────────────────
     async generateTrafficCSV(startDate: string, endDate: string): Promise<string> {
         this.logger.log(`Generating Traffic CSV for ${startDate} to ${endDate}`);
 
         const mappings = await this.pageMappingRepo.find();
 
-        // Query UTM analytics grouped by medium
+        // Build the date column list. Newest date first (matches sample template).
+        const dates = this.enumerateDates(startDate, endDate).reverse();
+        const dateHeaders = dates.map((d) => this.fmtHumanDate(d));
+
+        // Per-(medium, date) sessions
         const rows = await this.utmRepo.createQueryBuilder('a')
             .select([
-                'a.utmMedium as utm_medium',
-                'SUM(a.sessions) as sessions',
-                'SUM(a.users) as users',
-                'SUM(a.pageviews) as pageviews',
-                'AVG(a.engagementRate) as engagement_rate',
-                'SUM(a.recurringUsers) as recurring_users',
-                'SUM(a.newUsers) as new_users',
-                'SUM(a.eventCount) as event_count',
+                'a.utmMedium AS utm_medium',
+                `to_char(a.date::date, 'YYYY-MM-DD') AS date`,
+                'SUM(a.sessions) AS sessions',
             ])
-            .where(`a.date::date >= :startDate::date AND a.date::date <= :endDate::date`,
-                { startDate, endDate })
+            .where(`a.date::date >= :startDate::date AND a.date::date <= :endDate::date`, { startDate, endDate })
             .andWhere(
                 `(a.utmSource ILIKE '%face%' OR a.utmSource ILIKE '%ig%' OR a.utmSource ILIKE '%insta%' OR a.utmSource IN ('fb', 'Fb'))`,
             )
             .groupBy('a.utmMedium')
-            .orderBy('sessions', 'DESC')
+            .addGroupBy('a.date')
             .getRawMany();
 
-        // Map UTM mediums to page names using page-mappings
-        const mediumToPage = new Map<string, { pageName: string; category: string; team: string }>();
+        // Map UTM medium → { pageName, category, team, platform }
+        const mediumToPage = new Map<string, { pageName: string; category: string; team: string; platform: string }>();
         for (const mapping of mappings) {
             for (const medium of mapping.utmMediums) {
                 mediumToPage.set(medium.toLowerCase(), {
                     pageName: mapping.pageName,
                     category: mapping.category,
                     team: mapping.team || 'Unassigned',
+                    platform: mapping.platform || 'FB',
                 });
             }
         }
 
-        // Build enriched rows with team info
-        const enrichedRows: Array<{
-            pageName: string; category: string; team: string;
-            sessions: number; users: number; pageviews: number;
-            engagement_rate: number; recurring_users: number;
-            new_users: number; event_count: number;
-        }> = [];
+        // Aggregate by pageName × date (multiple mediums can resolve to the same page)
+        type PageBucket = {
+            pageName: string; category: string; team: string; platform: string;
+            perDay: Map<string, number>;
+        };
+        const pageData = new Map<string, PageBucket>();
 
         for (const row of rows) {
             const medium = (row.utm_medium || '').toLowerCase();
             const info = mediumToPage.get(medium);
-            enrichedRows.push({
-                pageName: info?.pageName || row.utm_medium || 'Unknown',
-                category: info?.category || 'Uncategorized',
-                team: info?.team || 'Unassigned',
-                sessions: Number(row.sessions || 0),
-                users: Number(row.users || 0),
-                pageviews: Number(row.pageviews || 0),
-                engagement_rate: Number(row.engagement_rate || 0),
-                recurring_users: Number(row.recurring_users || 0),
-                new_users: Number(row.new_users || 0),
-                event_count: Number(row.event_count || 0),
-            });
-        }
+            const pageName = info?.pageName || row.utm_medium || 'Unknown';
 
-        // Group by team
-        const teamGroups = new Map<string, {
-            pages: typeof enrichedRows;
-            totals: { sessions: number; users: number; pageviews: number; engagement_rate_sum: number; engagement_rate_count: number; recurring_users: number; new_users: number; event_count: number };
-        }>();
-
-        for (const row of enrichedRows) {
-            if (!teamGroups.has(row.team)) {
-                teamGroups.set(row.team, {
-                    pages: [],
-                    totals: { sessions: 0, users: 0, pageviews: 0, engagement_rate_sum: 0, engagement_rate_count: 0, recurring_users: 0, new_users: 0, event_count: 0 },
+            if (!pageData.has(pageName)) {
+                pageData.set(pageName, {
+                    pageName,
+                    category: info?.category || 'Uncategorized',
+                    team: info?.team || 'Unassigned',
+                    platform: info?.platform || 'FB',
+                    perDay: new Map(),
                 });
             }
-            const group = teamGroups.get(row.team)!;
-            group.pages.push(row);
-            group.totals.sessions += row.sessions;
-            group.totals.users += row.users;
-            group.totals.pageviews += row.pageviews;
-            group.totals.engagement_rate_sum += row.engagement_rate;
-            group.totals.engagement_rate_count += 1;
-            group.totals.recurring_users += row.recurring_users;
-            group.totals.new_users += row.new_users;
-            group.totals.event_count += row.event_count;
+            const entry = pageData.get(pageName)!;
+            const dateStr = this.toDateStr(row.date);
+            entry.perDay.set(dateStr, (entry.perDay.get(dateStr) || 0) + Number(row.sessions || 0));
         }
 
-        const csvRows: string[] = [
-            'Page Name,Category,Team,Sessions,Users,Pageviews,Engagement Rate,Recurring Users,New Users,Event Count',
-        ];
+        // Group pages → team → category
+        const teamMap = new Map<string, Map<string, PageBucket[]>>();
+        for (const [, page] of pageData) {
+            if (!teamMap.has(page.team)) teamMap.set(page.team, new Map());
+            const catMap = teamMap.get(page.team)!;
+            if (!catMap.has(page.category)) catMap.set(page.category, []);
+            catMap.get(page.category)!.push(page);
+        }
 
-        let grandTotal = { sessions: 0, users: 0, pageviews: 0, engagement_rate_sum: 0, engagement_rate_count: 0, recurring_users: 0, new_users: 0, event_count: 0 };
+        const csvRows: string[] = [];
+        const blanks = (n: number) => Array(n).fill('');
 
-        for (const [team, group] of teamGroups) {
-            const t = group.totals;
-            grandTotal.sessions += t.sessions;
-            grandTotal.users += t.users;
-            grandTotal.pageviews += t.pageviews;
-            grandTotal.engagement_rate_sum += t.engagement_rate_sum;
-            grandTotal.engagement_rate_count += t.engagement_rate_count;
-            grandTotal.recurring_users += t.recurring_users;
-            grandTotal.new_users += t.new_users;
-            grandTotal.event_count += t.event_count;
+        // ── Section 1: Team-wise daily totals ──
+        csvRows.push(this.joinRow(['Team', ...dateHeaders]));
+        const teamDailyTotals = new Map<string, number[]>();
+        const grandDaily = new Array(dates.length).fill(0);
+        for (const [team, catMap] of teamMap) {
+            const totals = new Array(dates.length).fill(0);
+            for (const [, pages] of catMap) {
+                for (const page of pages) {
+                    dates.forEach((d, i) => { totals[i] += page.perDay.get(d) || 0; });
+                }
+            }
+            teamDailyTotals.set(team, totals);
+            totals.forEach((v, i) => { grandDaily[i] += v; });
+            csvRows.push(this.joinRow([team, ...totals.map((n) => this.fmtInt(n))]));
+        }
+        csvRows.push(this.joinRow(['Total', ...grandDaily.map((n) => this.fmtInt(n))]));
 
-            const avgEngRate = t.engagement_rate_count > 0 ? t.engagement_rate_sum / t.engagement_rate_count : 0;
+        // Blank separator
+        csvRows.push('');
 
-            // Team subtotal row
-            csvRows.push([
-                this.escapeCSV(`${team} (Total)`),
-                '',
-                this.escapeCSV(team),
-                t.sessions,
-                t.users,
-                t.pageviews,
-                `${avgEngRate.toFixed(2)}%`,
-                t.recurring_users,
-                t.new_users,
-                t.event_count,
-            ].join(','));
+        // ── Section 2: Page-wise daily link clicks, grouped by team + category ──
+        // Header matches template: `,Page Name,Platform,Daily Link Clicks,,,,,,`
+        //                          `,,,<date1>,<date2>,...<date7>`
+        csvRows.push(this.joinRow(['', 'Page Name', 'Platform', 'Daily Link Clicks', ...blanks(dates.length - 1)]));
+        csvRows.push(this.joinRow(['', '', '', ...dateHeaders]));
 
-            // Individual page rows
-            for (const row of group.pages) {
-                csvRows.push([
-                    this.escapeCSV(`  ${row.pageName}`),
-                    this.escapeCSV(row.category),
-                    this.escapeCSV(row.team),
-                    row.sessions,
-                    row.users,
-                    row.pageviews,
-                    `${row.engagement_rate.toFixed(2)}%`,
-                    row.recurring_users,
-                    row.new_users,
-                    row.event_count,
-                ].join(','));
+        for (const [team, catMap] of teamMap) {
+            for (const [category, pages] of catMap) {
+                // Category subtotal row: <Team>,<Category>,,<day totals>
+                const catTotals = new Array(dates.length).fill(0);
+                for (const page of pages) {
+                    dates.forEach((d, i) => { catTotals[i] += page.perDay.get(d) || 0; });
+                }
+                csvRows.push(this.joinRow([team, category, '', ...catTotals.map((n) => this.fmtInt(n))]));
+
+                // Individual page rows
+                for (const page of pages) {
+                    const perDay = dates.map((d) => this.fmtInt(page.perDay.get(d) || 0));
+                    csvRows.push(this.joinRow(['', page.pageName, page.platform, ...perDay]));
+                }
             }
         }
 
-        // Grand total row
-        const grandAvgEngRate = grandTotal.engagement_rate_count > 0 ? grandTotal.engagement_rate_sum / grandTotal.engagement_rate_count : 0;
-        csvRows.push([
-            'Grand Total',
-            '',
-            '',
-            grandTotal.sessions,
-            grandTotal.users,
-            grandTotal.pageviews,
-            `${grandAvgEngRate.toFixed(2)}%`,
-            grandTotal.recurring_users,
-            grandTotal.new_users,
-            grandTotal.event_count,
-        ].join(','));
+        // TOTAL row — matches template: `,TOTAL,,<day totals>`
+        csvRows.push(this.joinRow(['', 'TOTAL', '', ...grandDaily.map((n) => this.fmtInt(n))]));
 
         return csvRows.join('\n');
     }
 
     // ─────────────────────────────────────────────────────
-    // 2. REVENUE CSV (pivot format)
+    // 2. REVENUE CSV — 7-day daily breakdown, team-wise + page-wise (with Division)
     // ─────────────────────────────────────────────────────
     async generateRevenueCSV(startDate: string, endDate: string): Promise<string> {
         this.logger.log(`Generating Revenue CSV for ${startDate} to ${endDate}`);
 
+        const dates = this.enumerateDates(startDate, endDate);
+        const dateHeaders = dates.map((d) => this.fmtHumanDate(d));
+
         const rows = await this.dailyRevenueRepo
             .createQueryBuilder('dr')
             .select([
+                `to_char(dr.date, 'YYYY-MM-DD') AS "date"`,
                 'rm.pageName AS "pageName"',
                 'rm.team AS "team"',
-                'SUM(dr.bonusRevenue) AS "bonus"',
-                'SUM(dr.photoRevenue) AS "photo"',
-                'SUM(dr.reelRevenue) AS "reel"',
-                'SUM(dr.storyRevenue) AS "story"',
-                'SUM(dr.textRevenue) AS "text"',
-                'SUM(dr.totalRevenue) AS "total"',
+                'dr.totalRevenue AS "total"',
             ])
             .innerJoin(RevenueMapping, 'rm', 'rm.pageId = dr.pageId')
             .where('dr.date >= :startDate', { startDate })
             .andWhere('dr.date <= :endDate', { endDate })
-            .groupBy('rm.pageName, rm.team')
             .orderBy('"team"', 'ASC')
             .addOrderBy('"pageName"', 'ASC')
             .getRawMany();
 
-        // Group by team for pivot structure
-        const teamGroups = new Map<string, { pages: typeof rows; totals: any }>();
+        // Page mapping lookup for Division (category) by pageName
+        const pageMappings = await this.pageMappingRepo.find();
+        const divisionByName = new Map<string, string>();
+        for (const m of pageMappings) {
+            divisionByName.set(m.pageName.trim().toLowerCase(), m.category);
+        }
+
+        // Aggregate: team → perDay, pages → { team, division, perDay }
+        const teamDaily = new Map<string, Map<string, number>>();
+        const pageDaily = new Map<string, { team: string; perDay: Map<string, number> }>();
 
         for (const row of rows) {
             const team = row.team || 'Unassigned';
-            if (!teamGroups.has(team)) {
-                teamGroups.set(team, {
-                    pages: [],
-                    totals: { bonus: 0, photo: 0, reel: 0, story: 0, text: 0, total: 0 },
-                });
-            }
-            const group = teamGroups.get(team)!;
-            group.pages.push(row);
-            group.totals.bonus += Number(row.bonus || 0);
-            group.totals.photo += Number(row.photo || 0);
-            group.totals.reel += Number(row.reel || 0);
-            group.totals.story += Number(row.story || 0);
-            group.totals.text += Number(row.text || 0);
-            group.totals.total += Number(row.total || 0);
+            const pageName = row.pageName || 'Unknown';
+            const dateStr = this.toDateStr(row.date);
+            const total = Number(row.total || 0);
+
+            if (!teamDaily.has(team)) teamDaily.set(team, new Map());
+            const td = teamDaily.get(team)!;
+            td.set(dateStr, (td.get(dateStr) || 0) + total);
+
+            if (!pageDaily.has(pageName)) pageDaily.set(pageName, { team, perDay: new Map() });
+            const pd = pageDaily.get(pageName)!;
+            pd.perDay.set(dateStr, (pd.perDay.get(dateStr) || 0) + total);
         }
 
-        const csvRows: string[] = [
-            'Team / Page,Bonus,Photo,Reel,Story,Text,Total',
-        ];
+        const csvRows: string[] = [];
 
-        let grandTotal = { bonus: 0, photo: 0, reel: 0, story: 0, text: 0, total: 0 };
-
-        for (const [team, group] of teamGroups) {
-            const t = group.totals;
-            grandTotal.bonus += t.bonus;
-            grandTotal.photo += t.photo;
-            grandTotal.reel += t.reel;
-            grandTotal.story += t.story;
-            grandTotal.text += t.text;
-            grandTotal.total += t.total;
-
-            // Team total row
-            csvRows.push([
-                this.escapeCSV(`${team} (Total)`),
-                this.fmtMoney(t.bonus),
-                this.fmtMoney(t.photo),
-                this.fmtMoney(t.reel),
-                this.fmtMoney(t.story),
-                this.fmtMoney(t.text),
-                this.fmtMoney(t.total),
-            ].join(','));
-
-            // Individual page rows
-            for (const page of group.pages) {
-                csvRows.push([
-                    this.escapeCSV(`  ${page.pageName}`),
-                    this.fmtMoney(page.bonus),
-                    this.fmtMoney(page.photo),
-                    this.fmtMoney(page.reel),
-                    this.fmtMoney(page.story),
-                    this.fmtMoney(page.text),
-                    this.fmtMoney(page.total),
-                ].join(','));
-            }
+        // ── Section 1: Team-wise daily revenue totals ──
+        csvRows.push(this.joinRow(['Team', ...dateHeaders]));
+        const grandDaily = new Array(dates.length).fill(0);
+        for (const [team, perDay] of teamDaily) {
+            const values = dates.map((d) => Number(perDay.get(d) || 0));
+            values.forEach((v, i) => { grandDaily[i] += v; });
+            csvRows.push(this.joinRow([team, ...values.map((v) => this.fmtMoney(v))]));
         }
+        csvRows.push(this.joinRow(['Total', ...grandDaily.map((v) => this.fmtMoney(v))]));
 
-        // Grand total row
-        csvRows.push([
-            'Grand Total',
-            this.fmtMoney(grandTotal.bonus),
-            this.fmtMoney(grandTotal.photo),
-            this.fmtMoney(grandTotal.reel),
-            this.fmtMoney(grandTotal.story),
-            this.fmtMoney(grandTotal.text),
-            this.fmtMoney(grandTotal.total),
-        ].join(','));
+        // Blank separator
+        csvRows.push('');
+
+        // ── Section 2: Page-wise daily revenue with Division + Monetization ──
+        csvRows.push(this.joinRow(['Pages', 'Division', 'Monetization', ...dateHeaders]));
+        // Sort by team, then page name, for a stable readable order
+        const sortedPages = Array.from(pageDaily.entries()).sort((a, b) => {
+            const ta = (a[1].team || '').localeCompare(b[1].team || '');
+            return ta !== 0 ? ta : a[0].localeCompare(b[0]);
+        });
+        for (const [pageName, entry] of sortedPages) {
+            const division = divisionByName.get(pageName.trim().toLowerCase()) || '';
+            const monetization = ''; // Not tracked in DB yet — column present to match template
+            const values = dates.map((d) => this.fmtMoney(Number(entry.perDay.get(d) || 0)));
+            csvRows.push(this.joinRow([pageName, division, monetization, ...values]));
+        }
 
         return csvRows.join('\n');
     }
@@ -492,5 +441,39 @@ export class CsvGeneratorService {
 
     private fmtMoney(value: any): string {
         return `$${Number(value || 0).toFixed(2)}`;
+    }
+
+    private fmtInt(n: number): string {
+        return Math.round(Number(n) || 0).toLocaleString('en-US');
+    }
+
+    /** Build inclusive date list (YYYY-MM-DD) from start→end. */
+    private enumerateDates(startDate: string, endDate: string): string[] {
+        const out: string[] = [];
+        const start = new Date(startDate + 'T00:00:00Z');
+        const end = new Date(endDate + 'T00:00:00Z');
+        for (let d = new Date(start); d <= end; d.setUTCDate(d.getUTCDate() + 1)) {
+            out.push(d.toISOString().split('T')[0]);
+        }
+        return out;
+    }
+
+    /** Normalise any date-like value to YYYY-MM-DD. */
+    private toDateStr(raw: any): string {
+        if (!raw) return '';
+        if (typeof raw === 'string') return raw.split('T')[0];
+        return new Date(raw).toISOString().split('T')[0];
+    }
+
+    /** `2026-04-08` → `8 Apr 2026` (matches the sample template header). */
+    private fmtHumanDate(iso: string): string {
+        const d = new Date(iso + 'T00:00:00Z');
+        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        return `${d.getUTCDate()} ${months[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
+    }
+
+    /** CSV-escape each cell and join with commas. */
+    private joinRow(cols: (string | number)[]): string {
+        return cols.map((c) => this.escapeCSV(String(c ?? ''))).join(',');
     }
 }
