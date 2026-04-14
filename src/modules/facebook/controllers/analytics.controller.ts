@@ -755,6 +755,9 @@ export class AnalyticsController {
         return ((current - previous) / Math.abs(previous)) * 100;
       };
 
+      console.log('[REVENUE DEBUG] currentRevenue total:', currentRevenue, '| prevRevenue total:', prevRevenue);
+      console.log('[REVENUE DEBUG] timeSeries revenue values:', timeSeries.map((s: any) => ({ date: s.date, revenue: s.revenue })));
+
       return res.status(200).json({
         timeSeries,
         totals: {
