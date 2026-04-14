@@ -24,7 +24,7 @@ import { EmailReportsModule } from './modules/email-reports/email-reports.module
       password: process.env.DB_PASSWORD || 'password',
       database: process.env.DB_NAME || 'social_studio_db',
       autoLoadEntities: true,
-      synchronize: process.env.NODE_ENV !== 'production',
+      synchronize: process.env.DB_SYNC === 'true' || process.env.NODE_ENV !== 'production',
       ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false,
     }),
 
