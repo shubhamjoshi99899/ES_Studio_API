@@ -407,6 +407,14 @@ export class AnalyticsController {
         .getRawMany();
 
       // --- CURRENT PERIOD: Revenue from authoritative daily_revenue table ---
+      // Debug: log what IDs we're querying and what exists in daily_revenue
+      const allDrPageIds = await this.dailyRevenueRepo
+        .createQueryBuilder('dr')
+        .select('DISTINCT dr."pageId"', 'pageId')
+        .getRawMany();
+      console.log('[REVENUE DEBUG] safeIds sent by frontend:', safeIds);
+      console.log('[REVENUE DEBUG] all pageIds in daily_revenue:', allDrPageIds.map((r: any) => r.pageId));
+
       const currentRevenueAgg: { date: string; revenue: string }[] =
         await this.dailyRevenueRepo
           .createQueryBuilder('dr')
@@ -418,10 +426,13 @@ export class AnalyticsController {
           .groupBy(`to_char(dr.date, 'YYYY-MM-DD')`)
           .getRawMany();
 
+      console.log('[REVENUE DEBUG] currentRevenueAgg result:', currentRevenueAgg);
+
       const revenueByDate: Record<string, number> = {};
       for (const row of currentRevenueAgg) {
         revenueByDate[row.date] = Number(row.revenue) || 0;
       }
+      console.log('[REVENUE DEBUG] revenueByDate:', revenueByDate);
 
       // --- CURRENT PERIOD: Post aggregation at DB level (GROUP BY date) ---
       const currentPostAgg: {
