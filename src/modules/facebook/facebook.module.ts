@@ -6,6 +6,7 @@ import { SocialProfile } from './entities/SocialProfile.entity';
 import { AnalyticsSnapshot } from './entities/AnalyticsSnapshot.entity';
 import { SocialPost } from './entities/SocialPost.entity';
 import { DemographicSnapshot } from './entities/DemographicSnapshot.entity';
+import { DailyRevenue } from '../revenue/entities/daily-revenue.entity';
 
 import { AnalyticsController } from './controllers/analytics.controller';
 
@@ -21,6 +22,7 @@ import { RevenueModule } from '../revenue/revenue.module';
       AnalyticsSnapshot,
       SocialPost,
       DemographicSnapshot,
+      DailyRevenue,
     ]),
     BullModule.registerQueue({
       name: 'social-sync-queue',

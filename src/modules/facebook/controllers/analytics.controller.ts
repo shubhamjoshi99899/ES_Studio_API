@@ -16,6 +16,7 @@ import {
   fetchDemographics,
   fetchDailyRevenue,
 } from '../services/meta.service';
+import { DailyRevenue } from '../../revenue/entities/daily-revenue.entity';
 
 /** Safety cap for profileIds arrays to avoid unbounded IN clauses */
 const MAX_PROFILE_IDS = 50;
@@ -31,6 +32,8 @@ export class AnalyticsController {
     @InjectRepository(SocialPost) private postRepo: Repository<SocialPost>,
     @InjectRepository(DemographicSnapshot)
     private demographicRepo: Repository<DemographicSnapshot>,
+    @InjectRepository(DailyRevenue)
+    private dailyRevenueRepo: Repository<DailyRevenue>,
     @InjectQueue('social-sync-queue') private syncQueue: Queue,
   ) {}
 
@@ -380,7 +383,6 @@ export class AnalyticsController {
         pageViews: string;
         messages: string;
         videoViews: string;
-        revenue: string;
       }[] = await this.snapshotRepo
         .createQueryBuilder('s')
         .select('s.date', 'date')
@@ -397,13 +399,29 @@ export class AnalyticsController {
           `COALESCE(SUM(CASE WHEN s.platform = 'facebook' THEN s."videoViews" ELSE 0 END), 0)`,
           'videoViews',
         )
-        .addSelect('COALESCE(SUM(s.revenue), 0)', 'revenue')
         .where('s."profileId" IN (:...ids)', { ids: safeIds })
         .andWhere('s.date >= :start', { start: currentStartStr })
         .andWhere('s.date <= :end', { end: currentEndStr })
         .groupBy('s.date')
         .orderBy('s.date', 'ASC')
         .getRawMany();
+
+      // --- CURRENT PERIOD: Revenue from authoritative daily_revenue table ---
+      const currentRevenueAgg: { date: string; revenue: string }[] =
+        await this.dailyRevenueRepo
+          .createQueryBuilder('dr')
+          .select(`to_char(dr.date, 'YYYY-MM-DD')`, 'date')
+          .addSelect('COALESCE(SUM(dr."totalRevenue"), 0)', 'revenue')
+          .where('dr."pageId" IN (:...ids)', { ids: safeIds })
+          .andWhere('dr.date >= :start', { start: currentStartStr })
+          .andWhere('dr.date <= :end', { end: currentEndStr })
+          .groupBy(`to_char(dr.date, 'YYYY-MM-DD')`)
+          .getRawMany();
+
+      const revenueByDate: Record<string, number> = {};
+      for (const row of currentRevenueAgg) {
+        revenueByDate[row.date] = Number(row.revenue) || 0;
+      }
 
       // --- CURRENT PERIOD: Post aggregation at DB level (GROUP BY date) ---
       const currentPostAgg: {
@@ -509,7 +527,7 @@ export class AnalyticsController {
                   ((totalEngagements / totalImpressions) * 100).toFixed(1),
                 )
               : 0,
-          revenue: Number(snap?.revenue || 0),
+          revenue: revenueByDate[dStr] || 0,
         });
 
         dIter.setDate(dIter.getDate() + 1);
@@ -618,7 +636,6 @@ export class AnalyticsController {
         fbVideoViews: string;
         pageViews: string;
         messages: string;
-        revenue: string;
       } | undefined = await this.snapshotRepo
         .createQueryBuilder('s')
         .select(
@@ -636,11 +653,20 @@ export class AnalyticsController {
         )
         .addSelect('COALESCE(SUM(s."pageViews"), 0)', 'pageViews')
         .addSelect('COALESCE(SUM(s."netMessages"), 0)', 'messages')
-        .addSelect('COALESCE(SUM(s.revenue), 0)', 'revenue')
         .where('s."profileId" IN (:...ids)', { ids: safeIds })
         .andWhere('s.date >= :start', { start: prevStartStr })
         .andWhere('s.date < :end', { end: currentStartStr })
         .getRawOne();
+
+      // --- PREVIOUS PERIOD: Revenue from authoritative daily_revenue table ---
+      const prevRevenueAgg: { revenue: string } | undefined =
+        await this.dailyRevenueRepo
+          .createQueryBuilder('dr')
+          .select('COALESCE(SUM(dr."totalRevenue"), 0)', 'revenue')
+          .where('dr."pageId" IN (:...ids)', { ids: safeIds })
+          .andWhere('dr.date >= :start', { start: prevStartStr })
+          .andWhere('dr.date < :end', { end: currentStartStr })
+          .getRawOne();
 
       const prevPostAgg: {
         engagements: string;
@@ -709,7 +735,7 @@ export class AnalyticsController {
         Number(prevPostAgg?.igVideoViews || 0);
       const prevPageViews = Number(prevSnapAgg?.pageViews || 0);
       const prevMessages = Number(prevSnapAgg?.messages || 0);
-      const prevRevenue = Number(prevSnapAgg?.revenue || 0);
+      const prevRevenue = Number(prevRevenueAgg?.revenue || 0);
       const prevEngRate =
         prevImpressions > 0 ? (prevEngagements / prevImpressions) * 100 : 0;
 
