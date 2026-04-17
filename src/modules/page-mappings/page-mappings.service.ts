@@ -50,7 +50,7 @@ export class PageMappingsService {
     if ('team' in partial) {
       const row = await this.mappingRepository.findOneBy({ id });
       if (row) {
-        await this.updateTeamByPageName(row.pageName, partial.team);
+        await this.updateTeamByPageName(row.pageName, partial.team ?? null);
       }
     }
 
