@@ -44,6 +44,35 @@ export class PageMappingsService {
       partial.team = (typeof t === 'string' && t.trim()) ? t.trim() : null;
     }
     await this.mappingRepository.update(id, partial);
+
+    // If team was changed, cascade to ALL rows with the same pageName so that
+    // a page with multiple UTM-medium rows always has a consistent team value.
+    if ('team' in partial) {
+      const row = await this.mappingRepository.findOneBy({ id });
+      if (row) {
+        await this.updateTeamByPageName(row.pageName, partial.team);
+      }
+    }
+
+    return this.mappingRepository.findOneBy({ id });
+  }
+
+  /**
+   * Update the team for ALL mapping rows that share the given pageName.
+   * This is the single source of truth for team assignment — it guarantees
+   * every row for a page always has the same team value.
+   */
+  async updateTeamByPageName(pageName: string, team: string | null) {
+    const normalizedTeam = (typeof team === 'string' && team.trim()) ? team.trim() : null;
+    await this.mappingRepository
+      .createQueryBuilder()
+      .update()
+      .set({ team: normalizedTeam })
+      .where('"pageName" = :pageName', { pageName })
+      .execute();
+  }
+
+  async findOneById(id: number) {
     return this.mappingRepository.findOneBy({ id });
   }
 
