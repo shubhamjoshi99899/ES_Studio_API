@@ -792,6 +792,206 @@ export class AnalyticsController {
     }
   }
 
+  /**
+   * PER-PAGE aggregate: returns one row per profileId with the same metrics
+   * as the main /aggregate endpoint, but broken down per page.
+   */
+  @Post('aggregate/per-page')
+  async getPerPageAggregatedData(
+    @Body()
+    body: {
+      profileIds: string[];
+      startDate?: string;
+      endDate?: string;
+    },
+    @Res() res: Response,
+  ) {
+    try {
+      const { profileIds, startDate, endDate } = body;
+      if (!profileIds || profileIds.length === 0)
+        return res.status(200).json({ pages: [] });
+
+      const safeIds = profileIds;
+
+      let currentStart: Date;
+      let currentEnd: Date;
+      let currentStartStr: string;
+      let currentEndStr: string;
+
+      if (startDate && endDate) {
+        currentStart = new Date(`${startDate}T00:00:00.000+05:30`);
+        currentEnd = new Date(`${endDate}T23:59:59.999+05:30`);
+        currentStartStr = startDate;
+        currentEndStr = endDate;
+      } else {
+        currentEnd = new Date();
+        currentStart = new Date();
+        currentStart.setDate(currentStart.getDate() - 30);
+        currentStartStr = currentStart
+          .toLocaleString('en-CA', { timeZone: 'Asia/Kolkata' })
+          .split(',')[0];
+        currentEndStr = currentEnd
+          .toLocaleString('en-CA', { timeZone: 'Asia/Kolkata' })
+          .split(',')[0];
+      }
+
+      // Fetch profile names
+      const profiles = await this.profileRepo.find({
+        where: { profileId: In(safeIds), isActive: true },
+        select: ['profileId', 'name', 'platform'],
+      });
+      const profileMap: Record<string, { name: string; platform: string }> = {};
+      for (const p of profiles) {
+        profileMap[p.profileId] = { name: p.name, platform: p.platform };
+      }
+
+      // --- Snapshot aggregation per profile ---
+      const snapAgg: {
+        profileId: string;
+        impressions: string;
+        engagements: string;
+        pageViews: string;
+        videoViews: string;
+      }[] = await this.snapshotRepo
+        .createQueryBuilder('s')
+        .select('s."profileId"', 'profileId')
+        .addSelect(
+          'COALESCE(SUM(GREATEST(s."totalImpressions", s."totalReach")), 0)',
+          'impressions',
+        )
+        .addSelect('COALESCE(SUM(s."totalEngagement"), 0)', 'engagements')
+        .addSelect('COALESCE(SUM(s."pageViews"), 0)', 'pageViews')
+        .addSelect(
+          `COALESCE(SUM(CASE WHEN s.platform = 'facebook' THEN s."videoViews" ELSE 0 END), 0)`,
+          'videoViews',
+        )
+        .where('s."profileId" IN (:...ids)', { ids: safeIds })
+        .andWhere('s.date >= :start', { start: currentStartStr })
+        .andWhere('s.date <= :end', { end: currentEndStr })
+        .groupBy('s."profileId"')
+        .getRawMany();
+
+      // --- Post aggregation per profile ---
+      const postAgg: {
+        profileId: string;
+        engagements: string;
+        fbImpressions: string;
+        igImpressions: string;
+        igVideoViews: string;
+      }[] = await this.postRepo
+        .createQueryBuilder('p')
+        .select('p."profileId"', 'profileId')
+        .addSelect(
+          'COALESCE(SUM(p.likes + p.comments + p.shares + p.clicks), 0)',
+          'engagements',
+        )
+        .addSelect(
+          `COALESCE(SUM(CASE WHEN p.platform = 'facebook' THEN p.reach ELSE 0 END), 0)`,
+          'fbImpressions',
+        )
+        .addSelect(
+          `COALESCE(SUM(CASE WHEN p.platform = 'instagram' THEN p.views + p.reach ELSE 0 END), 0)`,
+          'igImpressions',
+        )
+        .addSelect(
+          `COALESCE(SUM(CASE WHEN p.platform = 'instagram' THEN p.views ELSE 0 END), 0)`,
+          'igVideoViews',
+        )
+        .where('p."profileId" IN (:...ids)', { ids: safeIds })
+        .andWhere('p."postedAt" >= :start', { start: currentStart })
+        .andWhere('p."postedAt" <= :end', { end: currentEnd })
+        .groupBy('p."profileId"')
+        .getRawMany();
+
+      // --- Latest followers per profile (DISTINCT ON) ---
+      const followerRows: { profileId: string; totalFollowers: string }[] =
+        await this.snapshotRepo
+          .createQueryBuilder('s')
+          .select('s."profileId"', 'profileId')
+          .addSelect('s."totalFollowers"', 'totalFollowers')
+          .where(
+            `s.id IN (
+              SELECT DISTINCT ON (sub."profileId") sub.id
+              FROM analytics_snapshots sub
+              WHERE sub."profileId" IN (:...ids) AND sub."totalFollowers" > 0
+              ORDER BY sub."profileId", sub.date DESC
+            )`,
+            { ids: safeIds },
+          )
+          .getRawMany();
+
+      // --- Revenue per profile (from daily_revenue) ---
+      const revenueAgg: { pageId: string; revenue: string }[] =
+        await this.dailyRevenueRepo
+          .createQueryBuilder('dr')
+          .select('dr."pageId"', 'pageId')
+          .addSelect('COALESCE(SUM(dr."totalRevenue"), 0)', 'revenue')
+          .where('dr."pageId" IN (:...ids)', { ids: safeIds })
+          .andWhere('dr.date >= :start', { start: currentStartStr })
+          .andWhere('dr.date <= :end', { end: currentEndStr })
+          .groupBy('dr."pageId"')
+          .getRawMany();
+
+      // Build lookup maps
+      const snapMap: Record<string, (typeof snapAgg)[0]> = {};
+      for (const row of snapAgg) snapMap[row.profileId] = row;
+
+      const postMap: Record<string, (typeof postAgg)[0]> = {};
+      for (const row of postAgg) postMap[row.profileId] = row;
+
+      const followerMap: Record<string, number> = {};
+      for (const row of followerRows)
+        followerMap[row.profileId] = Number(row.totalFollowers);
+
+      const revenueMap: Record<string, number> = {};
+      for (const row of revenueAgg)
+        revenueMap[row.pageId] = Number(row.revenue) || 0;
+
+      // Build per-page result
+      const pages = safeIds.map((pid) => {
+        const snap = snapMap[pid];
+        const post = postMap[pid];
+
+        const snapImpressions = Number(snap?.impressions || 0);
+        const snapEngagements = Number(snap?.engagements || 0);
+        const snapVideoViews = Number(snap?.videoViews || 0);
+
+        const postEngagements = Number(post?.engagements || 0);
+        const postFbImpressions = Number(post?.fbImpressions || 0);
+        const postIgImpressions = Number(post?.igImpressions || 0);
+        const postIgVideoViews = Number(post?.igVideoViews || 0);
+
+        const totalImpressions =
+          snapImpressions + postFbImpressions + postIgImpressions;
+        const totalEngagements = snapEngagements + postEngagements;
+        const totalVideoViews = snapVideoViews + postIgVideoViews;
+        const followers = followerMap[pid] || 0;
+
+        const engagementRate =
+          totalImpressions > 0
+            ? ((totalEngagements / totalImpressions) * 100).toFixed(1)
+            : '0.0';
+
+        return {
+          profileId: pid,
+          pageName: profileMap[pid]?.name || pid,
+          platform: profileMap[pid]?.platform || 'facebook',
+          followers,
+          impressions: totalImpressions,
+          engagements: totalEngagements,
+          engagementRate,
+          pageViews: Number(snap?.pageViews || 0),
+          videoViews: totalVideoViews,
+          revenue: revenueMap[pid] || 0,
+        };
+      });
+
+      return res.status(200).json({ pages });
+    } catch (error: any) {
+      return res.status(500).json({ error: error.message });
+    }
+  }
+
   @Post('posts')
   async getPosts(
     @Body()
@@ -818,16 +1018,13 @@ export class AnalyticsController {
         start.setDate(start.getDate() - 30);
       }
 
-      const posts = await this.postRepo.find({
-        where: {
-          profileId: In(safeIds),
-          postedAt: Between(start, end),
-        },
-        order: {
-          postedAt: 'DESC',
-        },
-        take: 1000,
-      });
+      const posts = await this.postRepo
+        .createQueryBuilder('p')
+        .where('p."profileId" IN (:...ids)', { ids: safeIds })
+        .andWhere('p."postedAt" >= :start', { start: start.toISOString() })
+        .andWhere('p."postedAt" <= :end', { end: end.toISOString() })
+        .orderBy('p."postedAt"', 'DESC')
+        .getMany();
 
       return res.status(200).json(posts);
     } catch (error: any) {
