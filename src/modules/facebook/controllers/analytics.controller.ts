@@ -325,8 +325,9 @@ export class AnalyticsController {
       let currentStart: Date;
 
       if (startDate && endDate) {
-        currentStart = new Date(`${startDate}T00:00:00.000Z`);
-        currentEnd = new Date(`${endDate}T23:59:59.999Z`);
+        // Use IST offset so date boundaries align with the user's local dates
+        currentStart = new Date(`${startDate}T00:00:00.000+05:30`);
+        currentEnd = new Date(`${endDate}T23:59:59.999+05:30`);
       } else {
         currentEnd = new Date();
         currentStart = new Date();
@@ -801,8 +802,9 @@ export class AnalyticsController {
       let end: Date;
 
       if (startDate && endDate) {
-        start = new Date(`${startDate}T00:00:00.000Z`);
-        end = new Date(`${endDate}T23:59:59.999Z`);
+        // Use IST offset so date boundaries align with the user's local dates
+        start = new Date(`${startDate}T00:00:00.000+05:30`);
+        end = new Date(`${endDate}T23:59:59.999+05:30`);
       } else {
         end = new Date();
         start = new Date();
