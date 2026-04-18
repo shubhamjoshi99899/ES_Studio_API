@@ -288,14 +288,14 @@ export class CsvGeneratorService {
         const currentPosts = await this.postRepo.find({
             where: {
                 profileId: In(profileIds),
-                postedAt: Between(new Date(`${startDate}T00:00:00.000Z`), new Date(`${endDate}T23:59:59.999Z`)),
+                postedAt: Between(new Date(`${startDate}T00:00:00.000+05:30`), new Date(`${endDate}T23:59:59.999+05:30`)),
             },
         });
 
         const prevPosts = await this.postRepo.find({
             where: {
                 profileId: In(profileIds),
-                postedAt: Between(new Date(`${prevStartStr}T00:00:00.000Z`), new Date(`${prevEndStr}T23:59:59.999Z`)),
+                postedAt: Between(new Date(`${prevStartStr}T00:00:00.000+05:30`), new Date(`${prevEndStr}T23:59:59.999+05:30`)),
             },
         });
 

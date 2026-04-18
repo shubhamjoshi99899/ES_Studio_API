@@ -164,7 +164,7 @@ export class AnalyticsController {
       const end = new Date();
       const start = new Date();
       start.setDate(start.getDate() - days);
-      const startStr = start.toISOString().split('T')[0];
+      const startStr = start.toLocaleString('en-CA', { timeZone: 'Asia/Kolkata' }).split(',')[0];
 
       const profile = await this.profileRepo.findOne({ where: { profileId } });
       if (!profile) return res.status(404).json({ error: 'Profile not found' });
@@ -323,23 +323,28 @@ export class AnalyticsController {
 
       let currentEnd: Date;
       let currentStart: Date;
+      let currentStartStr: string;
+      let currentEndStr: string;
 
       if (startDate && endDate) {
-        // Use IST offset so date boundaries align with the user's local dates
+        // Use IST offset so timestamp boundaries align with the user's local dates
         currentStart = new Date(`${startDate}T00:00:00.000+05:30`);
         currentEnd = new Date(`${endDate}T23:59:59.999+05:30`);
+        // Keep the user's intended YYYY-MM-DD strings for date-type column queries
+        currentStartStr = startDate;
+        currentEndStr = endDate;
       } else {
         currentEnd = new Date();
         currentStart = new Date();
         currentStart.setDate(currentStart.getDate() - days);
+        // For relative ranges, extract IST date strings
+        currentStartStr = currentStart.toLocaleString('en-CA', { timeZone: 'Asia/Kolkata' }).split(',')[0];
+        currentEndStr = currentEnd.toLocaleString('en-CA', { timeZone: 'Asia/Kolkata' }).split(',')[0];
       }
-
-      const currentStartStr = currentStart.toISOString().split('T')[0];
-      const currentEndStr = currentEnd.toISOString().split('T')[0];
 
       const timeDiff = currentEnd.getTime() - currentStart.getTime();
       const prevStart = new Date(currentStart.getTime() - timeDiff);
-      const prevStartStr = prevStart.toISOString().split('T')[0];
+      const prevStartStr = prevStart.toLocaleString('en-CA', { timeZone: 'Asia/Kolkata' }).split(',')[0];
 
       // --- Background sync check (unchanged logic, already lightweight) ---
       const profilesToSync = await this.profileRepo.find({
@@ -485,10 +490,12 @@ export class AnalyticsController {
       }
 
       // --- Build time series (lightweight: iterate date range, merge pre-aggregated maps) ---
+      // Iterate using the user's intended date strings to avoid UTC/IST off-by-one issues
       const timeSeries: any[] = [];
-      const dIter = new Date(currentStart);
+      const dIter = new Date(currentStartStr + 'T00:00:00Z');
+      const dEnd = new Date(currentEndStr + 'T00:00:00Z');
 
-      while (dIter <= currentEnd) {
+      while (dIter <= dEnd) {
         const dStr = dIter.toISOString().split('T')[0];
 
         const snap = snapAggByDate[dStr];
@@ -530,7 +537,7 @@ export class AnalyticsController {
           revenue: revenueByDate[dStr] || 0,
         });
 
-        dIter.setDate(dIter.getDate() + 1);
+        dIter.setUTCDate(dIter.getUTCDate() + 1);
       }
 
       // --- Audience tracking: get prior follower counts + daily follower snapshots ---
