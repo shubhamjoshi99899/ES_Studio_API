@@ -325,9 +325,8 @@ export class AnalyticsController {
       let currentStart: Date;
 
       if (startDate && endDate) {
-        currentStart = new Date(startDate);
-        currentEnd = new Date(endDate);
-        currentEnd.setHours(23, 59, 59, 999);
+        currentStart = new Date(`${startDate}T00:00:00.000Z`);
+        currentEnd = new Date(`${endDate}T23:59:59.999Z`);
       } else {
         currentEnd = new Date();
         currentStart = new Date();
@@ -802,9 +801,8 @@ export class AnalyticsController {
       let end: Date;
 
       if (startDate && endDate) {
-        start = new Date(startDate);
-        end = new Date(endDate);
-        end.setHours(23, 59, 59, 999);
+        start = new Date(`${startDate}T00:00:00.000Z`);
+        end = new Date(`${endDate}T23:59:59.999Z`);
       } else {
         end = new Date();
         start = new Date();
