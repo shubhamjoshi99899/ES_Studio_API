@@ -3,18 +3,24 @@ import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { BullModule } from '@nestjs/bull';
 import { ScheduleModule } from '@nestjs/schedule';
+import { EventEmitterModule } from '@nestjs/event-emitter';
 import { FacebookModule } from './modules/facebook/facebook.module';
+import { PostStatusChangedListener } from './listeners/post-status-changed.listener';
 import { PageMappingsModule } from './modules/page-mappings/page-mappings.module';
 import { BigQueryModule } from './common/bigquery/bigquery.module';
 import { UtmAnalyticsModule } from './modules/utm-analytics/utm-analytics.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { RevenueModule } from './modules/revenue/revenue.module';
 import { EmailReportsModule } from './modules/email-reports/email-reports.module';
+import { OpsTeamModule } from './modules/ops/team/ops-team.module';
+import { OpsScheduleModule } from './modules/ops/schedule/ops-schedule.module';
+import { OpsCampaignsModule } from './modules/ops/campaigns/ops-campaigns.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     ScheduleModule.forRoot(),
+    EventEmitterModule.forRoot(),
 
     TypeOrmModule.forRoot({
       type: 'postgres',
@@ -24,7 +30,7 @@ import { EmailReportsModule } from './modules/email-reports/email-reports.module
       password: process.env.DB_PASSWORD || 'password',
       database: process.env.DB_NAME || 'social_studio_db',
       autoLoadEntities: true,
-      synchronize: process.env.DB_SYNC === 'true' || process.env.NODE_ENV !== 'production',
+      synchronize: false,
       ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false,
     }),
 
@@ -43,8 +49,11 @@ import { EmailReportsModule } from './modules/email-reports/email-reports.module
     BigQueryModule,
     RevenueModule,
     EmailReportsModule,
+    OpsTeamModule,
+    OpsScheduleModule,
+    OpsCampaignsModule,
   ],
   controllers: [],
-  providers: [],
+  providers: [PostStatusChangedListener],
 })
 export class AppModule {}

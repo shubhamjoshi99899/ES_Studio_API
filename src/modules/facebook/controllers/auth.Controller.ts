@@ -10,6 +10,9 @@ import { SocialPost } from '../entities/SocialPost.entity';
 import { DemographicSnapshot } from '../entities/DemographicSnapshot.entity';
 import { DailyRevenue } from '../../revenue/entities/daily-revenue.entity';
 import { RevenueMapping } from '../../revenue/entities/revenue-mapping.entity';
+import { ConfirmPagesDto } from '../dto/confirm-pages.dto';
+import { DisconnectMetaDto } from '../dto/disconnect-meta.dto';
+import { FetchPagesDto } from '../dto/fetch-pages.dto';
 import {
   exchangeForLongLivedToken,
   fetchLinkedInstagramAccounts,
@@ -36,7 +39,7 @@ export class AuthController {
 
   @Post('fetch-pages')
   async fetchPages(
-    @Body() body: { shortLivedToken: string },
+    @Body() body: FetchPagesDto,
     @Res() res: Response,
   ) {
     try {
@@ -55,7 +58,7 @@ export class AuthController {
 
   @Post('confirm-pages')
   async confirmPages(
-    @Body() body: { selectedPages?: any[]; selectedIgAccounts?: any[] },
+    @Body() body: ConfirmPagesDto,
     @Res() res: Response,
   ) {
     try {
@@ -143,8 +146,7 @@ export class AuthController {
 
   @Post('disconnect')
   async disconnectMeta(
-    @Body()
-    body: { deleteData: boolean; platform?: 'facebook' | 'instagram' | 'all' },
+    @Body() body: DisconnectMetaDto,
     @Res() res: Response,
   ) {
     try {

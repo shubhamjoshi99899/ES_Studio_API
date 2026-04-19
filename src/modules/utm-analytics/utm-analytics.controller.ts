@@ -10,20 +10,21 @@ import {
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { AnalyticsService } from './utm-analytics.service';
+import { GetAggregatedMetricsDto } from './dto/get-aggregated-metrics.dto';
+import { GetCampaignsDto } from './dto/get-campaigns.dto';
+import { GetCountryStatsDto } from './dto/get-country-stats.dto';
+import { GetHeadlinesDto } from './dto/get-headlines.dto';
+import { GetUtmMetricsDto } from './dto/get-utm-metrics.dto';
 
 @Controller('v1/analytics')
 export class AnalyticsController {
   constructor(private readonly analyticsService: AnalyticsService) {}
 
   @Get('utm/metrics')
-  async getUtmMetrics(
-    @Query('rollup') rollup: 'daily' | 'weekly' | 'monthly',
-    @Query('startDate') startDate: string,
-    @Query('endDate') endDate: string,
-    @Query('utmSource') utmSource?: string | string[],
-    @Query('utmMedium') utmMedium?: string | string[],
-    @Query('utmCampaign') utmCampaign?: string | string[],
-  ) {
+  async getUtmMetrics(@Query() query: GetUtmMetricsDto) {
+    const { rollup, startDate, endDate, utmSource, utmMedium, utmCampaign } =
+      query;
+
     if (!rollup || !startDate || !endDate) {
       throw new HttpException('Missing params', HttpStatus.BAD_REQUEST);
     }
@@ -43,7 +44,8 @@ export class AnalyticsController {
   }
 
   @Get('headlines')
-  async getHeadlines(@Query('utmSource') utmSource?: string | string[]) {
+  async getHeadlines(@Query() query: GetHeadlinesDto) {
+    const { utmSource } = query;
     const filters = {
       utmSource: this.normalizeArray(utmSource),
     };
@@ -51,13 +53,9 @@ export class AnalyticsController {
   }
 
   @Get('utm/metrics-aggregated')
-  async getAggregatedMetrics(
-    @Query('startDate') startDate: string,
-    @Query('endDate') endDate: string,
-    @Query('utmSource') utmSource?: string | string[],
-    @Query('utmMedium') utmMedium?: string | string[],
-    @Query('utmCampaign') utmCampaign?: string | string[],
-  ) {
+  async getAggregatedMetrics(@Query() query: GetAggregatedMetricsDto) {
+    const { startDate, endDate, utmSource, utmMedium, utmCampaign } = query;
+
     if (!startDate || !endDate) {
       throw new HttpException(
         'Missing startDate or endDate',
@@ -79,11 +77,9 @@ export class AnalyticsController {
   }
 
   @Get('campaigns')
-  async getCampaigns(
-    @Query('startDate') startDate: string,
-    @Query('endDate') endDate: string,
-    @Query('utmSource') utmSource?: string | string[],
-  ) {
+  async getCampaigns(@Query() query: GetCampaignsDto) {
+    const { startDate, endDate, utmSource } = query;
+
     if (!startDate || !endDate) {
       throw new HttpException(
         'Missing startDate or endDate',
@@ -99,11 +95,9 @@ export class AnalyticsController {
   }
 
   @Get('country-stats')
-  async getCountryStats(
-    @Query('startDate') startDate: string,
-    @Query('endDate') endDate: string,
-    @Query('utmSource') utmSource?: string | string[],
-  ) {
+  async getCountryStats(@Query() query: GetCountryStatsDto) {
+    const { startDate, endDate, utmSource } = query;
+
     if (!startDate || !endDate) {
       throw new HttpException(
         'Missing startDate or endDate',

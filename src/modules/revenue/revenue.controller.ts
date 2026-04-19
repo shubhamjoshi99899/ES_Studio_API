@@ -1,5 +1,8 @@
 import { Controller, Get, Patch, Param, Body, Query } from '@nestjs/common';
 import { RevenueService } from './revenue.service';
+import { BatchUpdateMappingTeamDto } from './dto/batch-update-mapping-team.dto';
+import { GetMetricsDto } from './dto/get-metrics.dto';
+import { UpdateMappingDto } from './dto/update-mapping.dto';
 
 @Controller('v1/revenue')
 export class RevenueController {
@@ -7,9 +10,9 @@ export class RevenueController {
 
     @Get('metrics')
     async getMetrics(
-        @Query('startDate') startDate: string,
-        @Query('endDate') endDate: string,
+        @Query() query: GetMetricsDto,
     ) {
+        const { startDate, endDate } = query;
         return this.revenueService.getAggregatedMetrics(startDate, endDate);
     }
 
@@ -26,8 +29,9 @@ export class RevenueController {
      * MUST be declared BEFORE the :id route.
      */
     @Patch('mappings/batch/team')
-    async batchUpdateTeam(@Body() body: { ids: number[]; team: string | null }) {
-        const { ids, team } = body;
+    async batchUpdateTeam(@Body() body: BatchUpdateMappingTeamDto) {
+        const { ids } = body;
+        const team = body.team ?? null;
         if (!Array.isArray(ids) || ids.length === 0) return this.revenueService.getMappings();
         for (const id of ids) {
             await this.revenueService.updateMappingTeam(id, team);
@@ -36,7 +40,7 @@ export class RevenueController {
     }
 
     @Patch('mappings/:id')
-    async updateMapping(@Param('id') id: string, @Body() body: { team: string | null }) {
-        return this.revenueService.updateMappingTeam(Number(id), body.team);
+    async updateMapping(@Param('id') id: string, @Body() body: UpdateMappingDto) {
+        return this.revenueService.updateMappingTeam(Number(id), body.team ?? null);
     }
 }

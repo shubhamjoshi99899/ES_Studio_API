@@ -17,6 +17,11 @@ import {
   fetchDailyRevenue,
 } from '../services/meta.service';
 import { DailyRevenue } from '../../revenue/entities/daily-revenue.entity';
+import { AggregateDemographicsDto } from '../dto/aggregate-demographics.dto';
+import { GetAggregatedDataDto } from '../dto/get-aggregated-data.dto';
+import { GetPostsDto } from '../dto/get-posts.dto';
+import { GetSmartAnalyticsDto } from '../dto/get-smart-analytics.dto';
+import { TriggerManualSyncDto } from '../dto/trigger-manual-sync.dto';
 
 /** Safety cap for profileIds arrays to avoid unbounded IN clauses */
 const MAX_PROFILE_IDS = 50;
@@ -83,7 +88,7 @@ export class AnalyticsController {
    */
   @Post('demographics/aggregate')
   async getAggregatedDemographics(
-    @Body() body: { profileIds: string[] },
+    @Body() body: AggregateDemographicsDto,
     @Res() res: Response,
   ) {
     try {
@@ -156,11 +161,11 @@ export class AnalyticsController {
   @Get(':profileId/data')
   async getSmartAnalytics(
     @Param('profileId') profileId: string,
-    @Query('days') daysStr: string,
+    @Query() query: GetSmartAnalyticsDto,
     @Res() res: Response,
   ) {
     try {
-      const days = Math.min(parseInt(daysStr) || 30, 365);
+      const days = Math.min(query.days || 30, 365);
       const end = new Date();
       const start = new Date();
       start.setDate(start.getDate() - days);
@@ -305,13 +310,7 @@ export class AnalyticsController {
    */
   @Post('aggregate')
   async getAggregatedData(
-    @Body()
-    body: {
-      profileIds: string[];
-      days?: number;
-      startDate?: string;
-      endDate?: string;
-    },
+    @Body() body: GetAggregatedDataDto,
     @Res() res: Response,
   ) {
     try {
@@ -787,8 +786,7 @@ export class AnalyticsController {
 
   @Post('posts')
   async getPosts(
-    @Body()
-    body: { profileIds: string[]; startDate?: string; endDate?: string },
+    @Body() body: GetPostsDto,
     @Res() res: Response,
   ) {
     try {
@@ -831,7 +829,7 @@ export class AnalyticsController {
   @Post('profiles/:profileId/sync')
   async triggerManualSync(
     @Param('profileId') profileId: string,
-    @Body() body: { days?: number },
+    @Body() body: TriggerManualSyncDto,
     @Res() res: Response,
   ) {
     try {

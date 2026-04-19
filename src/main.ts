@@ -1,4 +1,5 @@
 import { NestFactory } from '@nestjs/core';
+import { ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module';
 import cookieParser from 'cookie-parser';
 import compression from 'compression';
@@ -6,11 +7,20 @@ import compression from 'compression';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true,
+      transformOptions: { enableImplicitConversion: true },
+    }),
+  );
+
   app.use(cookieParser());
   app.use(compression({ threshold: 1024 })); // Compress responses > 1KB
 
   // Health check — no auth required, used by Docker HEALTHCHECK
-  app.use('/health', (req: any, res: any) => {
+  app.use('/health', (_req: any, res: any) => {
     res.status(200).json({ status: 'ok' });
   });
 

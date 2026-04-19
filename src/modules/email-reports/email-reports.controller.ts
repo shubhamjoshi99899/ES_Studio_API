@@ -1,5 +1,6 @@
 import { Controller, Get, Post, Delete, Param, Body, BadRequestException } from '@nestjs/common';
 import { EmailReportsService } from './email-reports.service';
+import { AddRecipientDto } from './dto/add-recipient.dto';
 
 @Controller('v1/email-reports')
 export class EmailReportsController {
@@ -11,7 +12,7 @@ export class EmailReportsController {
     }
 
     @Post('recipients')
-    async addRecipient(@Body() body: { email: string }) {
+    async addRecipient(@Body() body: AddRecipientDto) {
         const email = body?.email?.trim();
         if (!email || !this.isValidEmail(email)) {
             throw new BadRequestException('Invalid email address');

@@ -13,7 +13,9 @@ import {
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { PageMappingsService } from './page-mappings.service';
-import { PageMapping } from './entities/page-mapping.entity';
+import { BatchUpdateTeamDto } from './dto/batch-update-team.dto';
+import { CreatePageMappingDto } from './dto/create-page-mapping.dto';
+import { UpdatePageMappingDto } from './dto/update-page-mapping.dto';
 
 @Controller('page-mappings')
 export class PageMappingsController {
@@ -25,7 +27,7 @@ export class PageMappingsController {
   }
 
   @Post()
-  create(@Body() mapping: Partial<PageMapping>) {
+  create(@Body() mapping: CreatePageMappingDto) {
     return this.service.create(mapping);
   }
 
@@ -38,7 +40,7 @@ export class PageMappingsController {
    * path segment "batch" rather than treating it as a numeric :id param.
    */
   @Patch('batch/team')
-  async batchUpdateTeam(@Body() body: { ids: number[]; team: string | null }) {
+  async batchUpdateTeam(@Body() body: BatchUpdateTeamDto) {
     const { ids, team } = body;
     if (!Array.isArray(ids) || ids.length === 0) return this.service.findAll();
     for (const id of ids) {
@@ -53,7 +55,7 @@ export class PageMappingsController {
   }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() mapping: Partial<PageMapping>) {
+  update(@Param('id') id: string, @Body() mapping: UpdatePageMappingDto) {
     return this.service.update(+id, mapping);
   }
 
