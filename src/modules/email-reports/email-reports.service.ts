@@ -219,11 +219,10 @@ export class EmailReportsService {
     // ═══════════════════════════════════════════════════════
 
     private getDateStr(offsetDays: number): string {
-        // Use IST (UTC+5:30) for date calculation
+        // Use IST (Asia/Kolkata) for date calculation
         const now = new Date();
-        const istOffset = 5.5 * 60 * 60 * 1000;
-        const istNow = new Date(now.getTime() + istOffset);
-        istNow.setDate(istNow.getDate() + offsetDays);
-        return istNow.toISOString().split('T')[0];
+        now.setDate(now.getDate() + offsetDays);
+        // Extract YYYY-MM-DD in IST using en-CA locale (outputs YYYY-MM-DD format)
+        return now.toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
     }
 }

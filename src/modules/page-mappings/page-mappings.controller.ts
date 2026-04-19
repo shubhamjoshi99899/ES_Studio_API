@@ -43,8 +43,14 @@ export class PageMappingsController {
   async batchUpdateTeam(@Body() body: BatchUpdateTeamDto) {
     const { ids, team } = body;
     if (!Array.isArray(ids) || ids.length === 0) return this.service.findAll();
-    for (const id of ids) {
-      await this.service.update(id, { team });
+
+    // Resolve the pageName from any of the supplied IDs, then cascade the
+    // team update to ALL rows sharing that pageName.  This guarantees every
+    // UTM-medium row for the page stays in sync — even if the UI only knew
+    // about a subset of IDs.
+    const first = await this.service.findOneById(ids[0]);
+    if (first) {
+      await this.service.updateTeamByPageName(first.pageName, team);
     }
     return this.service.findAll();
   }

@@ -264,13 +264,13 @@ export class CsvGeneratorService {
         }
 
         // Compute previous period for comparison
-        const startD = new Date(startDate);
-        const endD = new Date(endDate);
+        const startD = new Date(`${startDate}T00:00:00.000Z`);
+        const endD = new Date(`${endDate}T00:00:00.000Z`);
         const daysSpan = Math.round((endD.getTime() - startD.getTime()) / (86400000)) + 1;
         const prevEnd = new Date(startD);
-        prevEnd.setDate(prevEnd.getDate() - 1);
+        prevEnd.setUTCDate(prevEnd.getUTCDate() - 1);
         const prevStart = new Date(prevEnd);
-        prevStart.setDate(prevStart.getDate() - daysSpan + 1);
+        prevStart.setUTCDate(prevStart.getUTCDate() - daysSpan + 1);
 
         const prevStartStr = prevStart.toISOString().split('T')[0];
         const prevEndStr = prevEnd.toISOString().split('T')[0];
@@ -288,14 +288,14 @@ export class CsvGeneratorService {
         const currentPosts = await this.postRepo.find({
             where: {
                 profileId: In(profileIds),
-                postedAt: Between(new Date(startDate), new Date(endDate + 'T23:59:59')),
+                postedAt: Between(new Date(`${startDate}T00:00:00.000+05:30`), new Date(`${endDate}T23:59:59.999+05:30`)),
             },
         });
 
         const prevPosts = await this.postRepo.find({
             where: {
                 profileId: In(profileIds),
-                postedAt: Between(new Date(prevStartStr), new Date(prevEndStr + 'T23:59:59')),
+                postedAt: Between(new Date(`${prevStartStr}T00:00:00.000+05:30`), new Date(`${prevEndStr}T23:59:59.999+05:30`)),
             },
         });
 
