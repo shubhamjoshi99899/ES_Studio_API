@@ -4,15 +4,15 @@ services:
     container_name: social_postgres
     restart: unless-stopped
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: password
-      POSTGRES_DB: social_studio
+      POSTGRES_USER: ${DB_USERNAME:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-password}
+      POSTGRES_DB: ${DB_NAME:-social_studio_db}
     ports:
       - '5432:5432'
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U postgres']
+      test: ['CMD-SHELL', 'pg_isready -U ${DB_USERNAME:-postgres} -d ${DB_NAME:-social_studio_db}']
       interval: 10s
       timeout: 5s
       retries: 5
@@ -21,10 +21,16 @@ services:
     image: redis:7-alpine
     container_name: social_redis
     restart: unless-stopped
+    command: ['redis-server', '--appendonly', 'yes']
     ports:
       - '6379:6379'
     volumes:
       - redis_data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   backend:
     build:
@@ -34,28 +40,39 @@ services:
     restart: unless-stopped
     ports:
       - '5000:5000'
-    volumes:
-      - ./gcp-key.json:/app/gcp-key.json:ro
+    env_file:
+      - .env
     environment:
-      - PORT=5000
-      - NODE_ENV=development
-      - FRONTEND_URL=http://localhost:3000
-      - DB_HOST=postgres-db
-      - DB_PORT=5432
-      - DB_USERNAME=postgres
-      - DB_PASSWORD=password
-      - DB_NAME=social_studio
-      - REDIS_HOST=redis-cache
-      - BIGQUERY_PROJECT_ID=${BIGQUERY_PROJECT_ID}
-      - GOOGLE_APPLICATION_CREDENTIALS=/app/gcp-key.json
-      - SETUP_SECRET=${SETUP_SECRET}
-      - META_APP_ID=${META_APP_ID}
-      - META_APP_SECRET=${META_APP_SECRET}
+      PORT: ${PORT:-5000}
+      NODE_ENV: production
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
+      DB_HOST: postgres-db
+      DB_PORT: 5432
+      DB_USERNAME: ${DB_USERNAME:-postgres}
+      DB_PASSWORD: ${DB_PASSWORD:-password}
+      DB_NAME: ${DB_NAME:-social_studio_db}
+      DB_SSL: 'false'
+      REDIS_HOST: redis-cache
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+      REDIS_TLS: 'false'
+      JWT_SECRET: ${JWT_SECRET:-change-me-access-secret}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-change-me-refresh-secret}
+      SETUP_SECRET: ${SETUP_SECRET:-change-me-setup-secret}
+      META_APP_ID: ${META_APP_ID:-}
+      META_APP_SECRET: ${META_APP_SECRET:-}
+      BIGQUERY_PROJECT_ID: ${BIGQUERY_PROJECT_ID:-}
+      GOOGLE_APPLICATION_CREDENTIALS: ${GOOGLE_APPLICATION_CREDENTIALS:-}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      SMTP_FROM: ${SMTP_FROM:-}
     depends_on:
       postgres-db:
         condition: service_healthy
       redis-cache:
-        condition: service_started
+        condition: service_healthy
 
 volumes:
   postgres_data:

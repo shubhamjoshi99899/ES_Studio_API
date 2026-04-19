@@ -4,13 +4,13 @@ services:
     container_name: social_postgres
     restart: unless-stopped
     environment:
-      POSTGRES_USER: postgres
+      POSTGRES_USER: ${DB_USERNAME:-postgres}
       POSTGRES_PASSWORD: ${DB_PASSWORD}
       POSTGRES_DB: ${DB_NAME:-social_studio_db}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U postgres']
+      test: ['CMD-SHELL', 'pg_isready -U ${DB_USERNAME:-postgres} -d ${DB_NAME:-social_studio_db}']
       interval: 10s
       timeout: 5s
       retries: 5
@@ -19,8 +19,14 @@ services:
     image: redis:7-alpine
     container_name: social_redis
     restart: unless-stopped
+    command: ['redis-server', '--appendonly', 'yes']
     volumes:
       - redis_data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   backend:
     build:
@@ -32,13 +38,18 @@ services:
       - '5000:5000'
     env_file:
       - .env.production
-    volumes:
-      - ./gcp-key.json:/app/gcp-key.json:ro
+    environment:
+      DB_HOST: postgres-db
+      DB_PORT: 5432
+      REDIS_HOST: redis-cache
+      REDIS_PORT: 6379
+      DB_SSL: 'false'
+      REDIS_TLS: 'false'
     depends_on:
       postgres-db:
         condition: service_healthy
       redis-cache:
-        condition: service_started
+        condition: service_healthy
 
 volumes:
   postgres_data:

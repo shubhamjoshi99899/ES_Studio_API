@@ -9,4 +9,5 @@ gcp-key.json
 .gitignore
 .vscode
 .idea
-docker-compose.yml
+coverage
+*.log
