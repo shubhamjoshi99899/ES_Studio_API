@@ -5,11 +5,12 @@ import { OpsCampaignsService } from './ops-campaigns.service';
 import { Campaign } from './entities/campaign.entity';
 import { CampaignPostLink } from './entities/campaign-post-link.entity';
 import { ContentPost } from '../schedule/entities/content-post.entity';
+import { ContentPostProfile } from './entities/content-post-profile.entity';
 import { AuditModule } from '../../../common/audit/audit.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Campaign, CampaignPostLink, ContentPost]),
+    TypeOrmModule.forFeature([Campaign, CampaignPostLink, ContentPost, ContentPostProfile]),
     AuditModule,
   ],
   controllers: [OpsCampaignsController],

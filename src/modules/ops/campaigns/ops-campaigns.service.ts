@@ -58,6 +58,24 @@ export class OpsCampaignsService {
     if (!campaign) throw new NotFoundException('Campaign not found');
 
     // Performance metrics via raw SQL to join analytics tables
+    //
+    // total_reach:
+    //   SELECT SUM(a."totalImpressions")
+    //   FROM campaign_post_links cpl
+    //   JOIN content_posts cp ON cp.id = cpl.post_id AND cp.workspace_id = $2
+    //   JOIN content_post_profiles cpp ON cpp.post_id = cp.id
+    //   JOIN social_profiles sp ON sp.id = cpp.profile_id
+    //   JOIN analytics_snapshots a ON a."profileId" = sp."profileId"
+    //   WHERE cpl.campaign_id = $1 AND cp.status = 'published'
+    //
+    // total_revenue:
+    //   SELECT SUM(dr."totalRevenue")
+    //   FROM campaign_post_links cpl
+    //   JOIN content_posts cp ON cp.id = cpl.post_id AND cp.workspace_id = $2
+    //   JOIN content_post_profiles cpp ON cpp.post_id = cp.id
+    //   JOIN social_profiles sp ON sp.id = cpp.profile_id
+    //   JOIN daily_revenue dr ON dr."pageId" = sp."profileId"
+    //   WHERE cpl.campaign_id = $1 AND cp.status = 'published'
     const [metrics] = await this.dataSource.query<
       Array<{
         total_posts: string;
@@ -68,12 +86,35 @@ export class OpsCampaignsService {
     >(
       `
       SELECT
-        COUNT(cpl.post_id)::int                                            AS total_posts,
-        COUNT(cp.id) FILTER (WHERE cp.status = 'published')::int           AS published_posts,
-        -- analytics_snapshots and daily_revenue have no FK to content_posts;
-        -- Phase 2 adds the profile-to-post mapping. Return 0 until then.
-        0::int                                                              AS total_reach,
-        0::numeric                                                          AS total_revenue
+        COUNT(cpl.post_id)::int                                             AS total_posts,
+        COUNT(cp.id) FILTER (WHERE cp.status = 'published')::int            AS published_posts,
+
+        COALESCE((
+          SELECT SUM(a."totalImpressions")
+          FROM content_posts cp2
+          JOIN content_post_profiles cpp ON cpp.post_id = cp2.id
+          JOIN social_profiles sp       ON sp.id        = cpp.profile_id
+          JOIN analytics_snapshots a    ON a."profileId" = sp."profileId"
+          WHERE cp2.id IN (
+            SELECT cpl2.post_id FROM campaign_post_links cpl2 WHERE cpl2.campaign_id = $1
+          )
+          AND cp2.workspace_id = $2
+          AND cp2.status = 'published'
+        ), 0)::int                                                           AS total_reach,
+
+        COALESCE((
+          SELECT SUM(dr."totalRevenue")
+          FROM content_posts cp3
+          JOIN content_post_profiles cpp2 ON cpp2.post_id  = cp3.id
+          JOIN social_profiles sp2        ON sp2.id        = cpp2.profile_id
+          JOIN daily_revenue dr           ON dr."pageId"   = sp2."profileId"
+          WHERE cp3.id IN (
+            SELECT cpl3.post_id FROM campaign_post_links cpl3 WHERE cpl3.campaign_id = $1
+          )
+          AND cp3.workspace_id = $2
+          AND cp3.status = 'published'
+        ), 0)::numeric                                                       AS total_revenue
+
       FROM campaign_post_links cpl
       LEFT JOIN content_posts cp
         ON cp.id = cpl.post_id AND cp.workspace_id = $2

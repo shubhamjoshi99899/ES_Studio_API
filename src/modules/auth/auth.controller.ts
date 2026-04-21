@@ -1,6 +1,7 @@
 import {
   Controller,
   Post,
+  Get,
   Body,
   Headers,
   UnauthorizedException,
@@ -144,5 +145,55 @@ export class AuthController {
     }
 
     return this.authService.createAdminUser(dto.email, dto.password);
+  }
+
+  // ── GET /api/auth/me ──────────────────────────────────────────────────────
+
+  @Get('me')
+  async me(@Req() req: Request) {
+    const user = req['user'] as { sub: string } | undefined;
+    if (!user?.sub) throw new UnauthorizedException('Not authenticated');
+    return this.authService.getMe(user.sub);
+  }
+
+  // ── POST /api/auth/switch-workspace ───────────────────────────────────────
+
+  @Post('switch-workspace')
+  @HttpCode(HttpStatus.OK)
+  async switchWorkspace(
+    @Body() body: { workspaceId: string },
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const user = req['user'] as { sub: string } | undefined;
+    if (!user?.sub) throw new UnauthorizedException('Not authenticated');
+
+    const ip = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim()
+      ?? req.socket.remoteAddress
+      ?? 'unknown';
+    const userAgent = req.headers['user-agent'] ?? 'unknown';
+
+    const result = await this.authService.switchWorkspace(
+      user.sub,
+      body.workspaceId,
+      ip,
+      userAgent,
+    );
+
+    res.cookie('access_token', result.accessToken, {
+      ...COOKIE_BASE,
+      maxAge: ACCESS_TOKEN_TTL,
+    });
+    res.cookie('refresh_token', result.refreshToken, {
+      ...COOKIE_BASE,
+      maxAge: REFRESH_TOKEN_TTL,
+      path: '/api/auth/refresh',
+    });
+
+    return {
+      workspaceId: result.workspaceId,
+      workspaceName: result.workspaceName,
+      plan: result.plan,
+    };
   }
 }

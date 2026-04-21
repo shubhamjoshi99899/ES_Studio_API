@@ -15,6 +15,11 @@ import { EmailReportsModule } from './modules/email-reports/email-reports.module
 import { OpsTeamModule } from './modules/ops/team/ops-team.module';
 import { OpsScheduleModule } from './modules/ops/schedule/ops-schedule.module';
 import { OpsCampaignsModule } from './modules/ops/campaigns/ops-campaigns.module';
+import { NotificationsModule } from './notifications/notifications.module';
+import { OpsAlertsModule } from './modules/ops/alerts/ops-alerts.module';
+import { InAppNotification } from './modules/ops/alerts/entities/in-app-notification.entity';
+import { InboxModule } from './modules/inbox/inbox.module';
+import { BillingModule } from './modules/billing/billing.module';
 
 @Module({
   imports: [
@@ -42,6 +47,7 @@ import { OpsCampaignsModule } from './modules/ops/campaigns/ops-campaigns.module
         tls: process.env.REDIS_TLS === 'true' ? {} : undefined,
       },
     }),
+    TypeOrmModule.forFeature([InAppNotification]),
     AuthModule,
     FacebookModule,
     UtmAnalyticsModule,
@@ -52,6 +58,10 @@ import { OpsCampaignsModule } from './modules/ops/campaigns/ops-campaigns.module
     OpsTeamModule,
     OpsScheduleModule,
     OpsCampaignsModule,
+    NotificationsModule,
+    OpsAlertsModule,
+    InboxModule,
+    BillingModule,
   ],
   controllers: [],
   providers: [PostStatusChangedListener],

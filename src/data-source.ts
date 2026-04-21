@@ -21,6 +21,17 @@ import { ContentPost } from './modules/ops/schedule/entities/content-post.entity
 import { ContentPostApproval } from './modules/ops/schedule/entities/content-post-approval.entity';
 import { ContentPublishAttempt } from './modules/ops/schedule/entities/content-publish-attempt.entity';
 import { AuditLog } from './common/audit/audit-log.entity';
+import { ContentPostProfile } from './modules/ops/campaigns/entities/content-post-profile.entity';
+import { AlertRule } from './modules/ops/alerts/entities/alert-rule.entity';
+import { InsightCard } from './modules/ops/alerts/entities/insight-card.entity';
+import { InAppNotification } from './modules/ops/alerts/entities/in-app-notification.entity';
+import { InboxContact } from './modules/inbox/entities/inbox-contact.entity';
+import { InboxThread } from './modules/inbox/entities/inbox-thread.entity';
+import { InboxMessage } from './modules/inbox/entities/inbox-message.entity';
+import { InboxNote } from './modules/inbox/entities/inbox-note.entity';
+import { PlatformConnection } from './modules/inbox/entities/platform-connection.entity';
+import { WorkspaceSubscription } from './modules/billing/entities/workspace-subscription.entity';
+import { UsageRecord } from './modules/billing/entities/usage-record.entity';
 
 export const AppDataSource = new DataSource({
   type: 'postgres',
@@ -52,6 +63,17 @@ export const AppDataSource = new DataSource({
     ContentPostApproval,
     ContentPublishAttempt,
     AuditLog,
+    ContentPostProfile,
+    AlertRule,
+    InsightCard,
+    InAppNotification,
+    InboxContact,
+    InboxThread,
+    InboxMessage,
+    InboxNote,
+    PlatformConnection,
+    WorkspaceSubscription,
+    UsageRecord,
   ],
   migrations: ['src/migrations/*.ts'],
 });

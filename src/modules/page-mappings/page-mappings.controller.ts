@@ -50,7 +50,7 @@ export class PageMappingsController {
     // about a subset of IDs.
     const first = await this.service.findOneById(ids[0]);
     if (first) {
-      await this.service.updateTeamByPageName(first.pageName, team);
+      await this.service.updateTeamByPageName(first.pageName, team ?? null);
     }
     return this.service.findAll();
   }
