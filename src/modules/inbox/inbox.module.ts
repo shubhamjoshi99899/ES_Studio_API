@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { BullModule } from '@nestjs/bull';
+import { AuditModule } from '../../common/audit/audit.module';
 
 import { InboxContact } from './entities/inbox-contact.entity';
 import { InboxThread } from './entities/inbox-thread.entity';
@@ -15,6 +16,8 @@ import { TikTokAdapter } from './adapters/tiktok.adapter';
 
 import { InboxService } from './inbox.service';
 import { InboxPollProcessor } from './inbox-poll.processor';
+import { OpsInboxService } from './ops-inbox.service';
+import { OpsInboxController } from './ops-inbox.controller';
 
 @Module({
   imports: [
@@ -25,8 +28,10 @@ import { InboxPollProcessor } from './inbox-poll.processor';
       InboxNote,
       PlatformConnection,
     ]),
+    AuditModule,
     BullModule.registerQueue({ name: 'inbox-poll' }),
   ],
+  controllers: [OpsInboxController],
   providers: [
     // Adapters
     MetaFacebookAdapter,
@@ -49,6 +54,7 @@ import { InboxPollProcessor } from './inbox-poll.processor';
 
     InboxService,
     InboxPollProcessor,
+    OpsInboxService,
   ],
   exports: [InboxService],
 })

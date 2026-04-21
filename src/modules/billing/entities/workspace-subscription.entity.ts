@@ -4,7 +4,7 @@ import {
   PrimaryGeneratedColumn,
   CreateDateColumn,
   UpdateDateColumn,
-  ManyToOne,
+  OneToOne,
   JoinColumn,
   Index,
 } from 'typeorm';
@@ -22,7 +22,7 @@ export class WorkspaceSubscription {
   @Column({ name: 'workspace_id', type: 'uuid', unique: true })
   workspaceId: string;
 
-  @ManyToOne(() => Workspace, { onDelete: 'CASCADE' })
+  @OneToOne(() => Workspace, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'workspace_id' })
   workspace: Workspace;
 

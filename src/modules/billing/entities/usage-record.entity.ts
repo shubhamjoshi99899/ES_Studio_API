@@ -2,10 +2,10 @@ import {
   Entity,
   Column,
   PrimaryGeneratedColumn,
+  CreateDateColumn,
   ManyToOne,
   JoinColumn,
   Index,
-  CreateDateColumn,
 } from 'typeorm';
 import { Workspace } from '../../workspaces/entities/workspace.entity';
 
@@ -29,9 +29,12 @@ export class UsageRecord {
   @Column({ type: 'numeric' })
   quantity: number;
 
-  @CreateDateColumn({ name: 'recorded_at' })
+  @Column({ name: 'recorded_at', type: 'timestamp' })
   recordedAt: Date;
 
   @Column({ name: 'stripe_usage_record_id', type: 'text', nullable: true })
   stripeUsageRecordId: string | null;
+
+  @CreateDateColumn({ name: 'created_at' })
+  createdAt: Date;
 }

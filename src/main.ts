@@ -1,11 +1,17 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
+import express from 'express';
 import { AppModule } from './app.module';
 import cookieParser from 'cookie-parser';
 import compression from 'compression';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, { rawBody: true });
+
+  app.use(
+    '/api/billing/webhook',
+    express.raw({ type: 'application/json' }),
+  );
 
   app.useGlobalPipes(
     new ValidationPipe({
