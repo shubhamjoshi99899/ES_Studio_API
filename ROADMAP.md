@@ -104,3 +104,17 @@ Before Phase 4 starts, the product is billable:
 - Meta inbox real
 - Workspace switcher working
 Ship to first paying customer before writing Phase 4 code.
+
+## Phase 3 — COMPLETE (v0.3-phase3)
+69 tests passing. Build clean.
+
+## ⚡ Monetisation checkpoint
+The product is now billable. Before writing Phase 4 code:
+
+- [ ] Set Stripe env vars in production
+- [ ] Test webhook with: stripe listen --forward-to localhost:3000/api/billing/webhook  
+- [ ] Connect one Meta account via platform_connections
+- [ ] Onboard first paying customer at $79–199/mo
+- [ ] Confirm plan enforcement (402/403) works end to end
+
+Ship to a paying customer first. Phase 4 after.

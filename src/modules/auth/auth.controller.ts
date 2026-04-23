@@ -13,11 +13,15 @@ import {
 } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { Throttle } from '@nestjs/throttler';
+import { AuthGuard } from '@nestjs/passport';
 import { AuthService } from './auth.service';
+import { WorkspacesService } from '../workspaces/workspaces.service';
 import { Public } from '../../common/decorators/public.decorator';
 import { SetupGuard } from '../../common/guards/setup.guard';
 import { LoginDto } from './dto/login.dto';
 import { SetupAdminDto } from './dto/setup-admin.dto';
+import { RegisterDto } from './dto/register.dto';
+import { CreateWorkspaceDto } from '../workspaces/dto/create-workspace.dto';
 
 const ACCESS_TOKEN_TTL  = 15 * 60 * 1000;           // 15 minutes
 const REFRESH_TOKEN_TTL = 30 * 24 * 60 * 60 * 1000; // 30 days
@@ -30,7 +34,10 @@ const COOKIE_BASE = {
 
 @Controller('api/auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly workspacesService: WorkspacesService,
+  ) {}
 
   @Public()
   @Throttle({ default: { limit: 5, ttl: 900_000 } })
@@ -145,6 +152,103 @@ export class AuthController {
     }
 
     return this.authService.createAdminUser(dto.email, dto.password);
+  }
+
+  // ── POST /api/auth/workspace/create ──────────────────────────────────────
+
+  @Post('workspace/create')
+  @HttpCode(HttpStatus.CREATED)
+  async createWorkspace(
+    @Body() dto: CreateWorkspaceDto,
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const user = req['user'] as { sub: string; email: string } | undefined;
+    if (!user?.sub) throw new UnauthorizedException('Not authenticated');
+
+    const { workspace, accessToken } =
+      await this.workspacesService.createWorkspaceWithOwner(user.sub, user.email, dto);
+
+    res.cookie('access_token', accessToken, {
+      ...COOKIE_BASE,
+      maxAge: ACCESS_TOKEN_TTL,
+    });
+
+    return {
+      workspaceId: workspace.id,
+      workspaceName: workspace.name,
+      plan: workspace.plan,
+    };
+  }
+
+  // ── POST /api/auth/register ───────────────────────────────────────────────
+
+  @Public()
+  @Throttle({ default: { limit: 5, ttl: 900_000 } })
+  @HttpCode(HttpStatus.CREATED)
+  @Post('register')
+  register(@Body() dto: RegisterDto) {
+    return this.authService.register(dto);
+  }
+
+  // ── GET /api/auth/verify-email ────────────────────────────────────────────
+
+  @Public()
+  @Get('verify-email')
+  async verifyEmail(
+    @Req() req: Request,
+    @Res() res: Response,
+  ) {
+    const token = (req.query as Record<string, string>)['token'];
+    if (!token) {
+      const frontendUrl = process.env.FRONTEND_URL ?? '';
+      return res.redirect(302, `${frontendUrl}/login?error=invalid_token`);
+    }
+
+    try {
+      const { accessToken } = await this.authService.verifyEmail(token);
+      res.cookie('access_token', accessToken, { ...COOKIE_BASE, maxAge: ACCESS_TOKEN_TTL });
+      const frontendUrl = process.env.FRONTEND_URL ?? '';
+      res.redirect(302, `${frontendUrl}/onboarding`);
+    } catch {
+      const frontendUrl = process.env.FRONTEND_URL ?? '';
+      res.redirect(302, `${frontendUrl}/login?error=invalid_token`);
+    }
+  }
+
+  // ── GET /api/auth/google ──────────────────────────────────────────────────
+
+  @Public()
+  @UseGuards(AuthGuard('google'))
+  @Get('google')
+  googleLogin() {
+    // Passport intercepts and redirects to Google consent screen
+  }
+
+  @Public()
+  @UseGuards(AuthGuard('google'))
+  @Get('google/callback')
+  async googleCallback(@Req() req: Request, @Res() res: Response) {
+    try {
+      const googleUser = req['user'] as {
+        email: string;
+        name: string;
+        googleId: string;
+        avatar: string | null;
+      };
+      const result = await this.authService.handleGoogleAuth(googleUser);
+
+      res.cookie('access_token', result.accessToken, {
+        ...COOKIE_BASE,
+        maxAge: ACCESS_TOKEN_TTL,
+      });
+
+      const frontendUrl = process.env.FRONTEND_URL ?? '';
+      res.redirect(302, result.isNew ? `${frontendUrl}/onboarding` : `${frontendUrl}/dashboard`);
+    } catch {
+      const frontendUrl = process.env.FRONTEND_URL ?? '';
+      res.redirect(302, `${frontendUrl}/login?error=oauth_failed`);
+    }
   }
 
   // ── GET /api/auth/me ──────────────────────────────────────────────────────

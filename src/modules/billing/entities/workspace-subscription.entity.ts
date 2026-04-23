@@ -26,8 +26,8 @@ export class WorkspaceSubscription {
   @JoinColumn({ name: 'workspace_id' })
   workspace: Workspace;
 
-  @Column({ name: 'stripe_customer_id', type: 'text', unique: true })
-  stripeCustomerId: string;
+  @Column({ name: 'stripe_customer_id', type: 'text', unique: true, nullable: true })
+  stripeCustomerId: string | null;
 
   @Column({ name: 'stripe_subscription_id', type: 'text', nullable: true, unique: true })
   stripeSubscriptionId: string | null;

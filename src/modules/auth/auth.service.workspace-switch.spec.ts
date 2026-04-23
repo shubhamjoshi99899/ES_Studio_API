@@ -7,6 +7,7 @@ import { DataSource } from 'typeorm';
 import { AuthService } from './auth.service';
 import { User } from './entities/user.entity';
 import { Session } from './entities/session.entity';
+import { MailService } from '../../common/mail/mail.service';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -61,6 +62,7 @@ describe('AuthService — workspace switcher', () => {
         { provide: getRepositoryToken(Session), useValue: sessionRepo },
         { provide: JwtService,   useValue: jwtService },
         { provide: DataSource,   useValue: dataSource },
+        { provide: MailService,  useValue: { sendVerification: jest.fn() } },
       ],
     }).compile();
 

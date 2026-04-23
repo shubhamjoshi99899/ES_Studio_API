@@ -12,10 +12,11 @@ import {
 import type { Request } from 'express';
 import { WorkspaceId } from '../../../common/decorators/workspace-id.decorator';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
+import { OnboardingGuard } from '../../../guards/onboarding.guard';
 import { OpsScheduleService } from './ops-schedule.service';
 
 @Controller('api/ops/schedule')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, OnboardingGuard)
 export class OpsScheduleController {
   constructor(private readonly opsScheduleService: OpsScheduleService) {}
 

@@ -12,6 +12,8 @@ import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
 import { User } from './entities/user.entity';
 import { Session } from './entities/session.entity';
+import { RegisterDto } from './dto/register.dto';
+import { MailService } from '../../common/mail/mail.service';
 
 export interface JwtPayload {
   sub: string;          // user id
@@ -28,6 +30,7 @@ export class AuthService {
     private sessionRepo: Repository<Session>,
     private dataSource: DataSource,
     private jwtService: JwtService,
+    private mailService: MailService,
   ) {}
 
   // ── Login ────────────────────────────────────────────────────────────────
@@ -41,6 +44,7 @@ export class AuthService {
     const user = await this.userRepo.findOne({ where: { email } });
     if (!user) throw new UnauthorizedException('Invalid credentials');
 
+    if (!user.passwordHash) throw new UnauthorizedException('Invalid credentials');
     const isMatch = await bcrypt.compare(password, user.passwordHash);
     if (!isMatch) throw new UnauthorizedException('Invalid credentials');
 
@@ -188,6 +192,92 @@ export class AuthService {
       currentWorkspaceId,
       workspaces,
     };
+  }
+
+  // ── Google OAuth ──────────────────────────────────────────────────────────
+
+  async handleGoogleAuth(googleUser: {
+    email: string;
+    name: string;
+    googleId: string;
+    avatar: string | null;
+  }): Promise<{ accessToken: string; isNew: boolean }> {
+    let user = await this.userRepo.findOne({ where: { email: googleUser.email } });
+
+    if (user) {
+      if (!user.googleId) {
+        await this.userRepo.update(user.id, { googleId: googleUser.googleId });
+        user.googleId = googleUser.googleId;
+      }
+    } else {
+      user = this.userRepo.create({
+        email: googleUser.email,
+        name: googleUser.name,
+        googleId: googleUser.googleId,
+        avatarUrl: googleUser.avatar,
+        passwordHash: null,
+        emailVerified: true,
+      });
+      await this.userRepo.save(user);
+    }
+
+    const workspaceId = await this.resolveWorkspaceId(user.id);
+    const payload: JwtPayload = { sub: user.id, email: user.email, workspaceId };
+    const accessToken = this.jwtService.sign(payload, {
+      secret: process.env.JWT_SECRET,
+      expiresIn: '15m',
+    });
+
+    return { accessToken, isNew: workspaceId === null };
+  }
+
+  // ── Register ──────────────────────────────────────────────────────────────
+
+  async register(dto: RegisterDto): Promise<{ message: string }> {
+    const existing = await this.userRepo.findOne({ where: { email: dto.email } });
+    if (existing) throw new ConflictException('An account with this email already exists');
+
+    const passwordHash = await bcrypt.hash(dto.password, 12);
+    const verificationToken = crypto.randomBytes(32).toString('hex');
+    const verificationTokenExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+
+    const user = this.userRepo.create({
+      email: dto.email,
+      passwordHash,
+      emailVerified: false,
+      verificationToken,
+      verificationTokenExpiresAt,
+    });
+    await this.userRepo.save(user);
+
+    await this.mailService.sendVerification(dto.email, verificationToken);
+
+    return { message: 'Check your email to verify your account' };
+  }
+
+  // ── Verify email ──────────────────────────────────────────────────────────
+
+  async verifyEmail(token: string): Promise<{ accessToken: string }> {
+    const user = await this.userRepo.findOne({ where: { verificationToken: token } });
+    if (!user) throw new BadRequestException('Invalid verification token');
+
+    if (!user.verificationTokenExpiresAt || user.verificationTokenExpiresAt < new Date()) {
+      throw new BadRequestException('Verification token has expired');
+    }
+
+    await this.userRepo.update(user.id, {
+      emailVerified: true,
+      verificationToken: null,
+      verificationTokenExpiresAt: null,
+    });
+
+    const payload: JwtPayload = { sub: user.id, email: user.email, workspaceId: null };
+    const accessToken = this.jwtService.sign(payload, {
+      secret: process.env.JWT_SECRET,
+      expiresIn: '15m',
+    });
+
+    return { accessToken };
   }
 
   // ── Internal helpers ──────────────────────────────────────────────────────

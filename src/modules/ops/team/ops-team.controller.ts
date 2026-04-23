@@ -10,10 +10,11 @@ import {
 } from '@nestjs/common';
 import { WorkspaceId } from '../../../common/decorators/workspace-id.decorator';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
+import { OnboardingGuard } from '../../../guards/onboarding.guard';
 import { OpsTeamService } from './ops-team.service';
 
 @Controller('api/ops/team')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, OnboardingGuard)
 export class OpsTeamController {
   constructor(private readonly opsTeamService: OpsTeamService) {}
 

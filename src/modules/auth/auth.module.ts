@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { JwtModule } from '@nestjs/jwt';
+import { PassportModule } from '@nestjs/passport';
 import { APP_GUARD } from '@nestjs/core';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { User } from './entities/user.entity';
@@ -9,10 +10,18 @@ import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { SetupGuard } from '../../common/guards/setup.guard';
+import { GoogleStrategy } from './strategies/google.strategy';
+import { MailModule } from '../../common/mail/mail.module';
+import { WorkspacesModule } from '../workspaces/workspaces.module';
+import { EmailVerifiedGuard } from '../../guards/email-verified.guard';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([User, Session]),
+
+    PassportModule.register({ defaultStrategy: 'jwt' }),
+    MailModule,
+    WorkspacesModule,
 
     // JwtModule registered without a default secret — each sign/verify call
     // passes the secret explicitly so access and refresh secrets stay separate.
@@ -30,11 +39,18 @@ import { SetupGuard } from '../../common/guards/setup.guard';
   providers: [
     AuthService,
     SetupGuard,
+    GoogleStrategy,
 
     // Global JWT guard replaces the old ApiKeyGuard
     {
       provide: APP_GUARD,
       useClass: JwtAuthGuard,
+    },
+
+    // Global email-verified guard — runs after JwtAuthGuard, skips @Public() routes
+    {
+      provide: APP_GUARD,
+      useClass: EmailVerifiedGuard,
     },
 
     // Global throttler guard — enforces @Throttle() decorators app-wide
