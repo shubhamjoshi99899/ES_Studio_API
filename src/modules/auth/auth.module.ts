@@ -13,7 +13,6 @@ import { SetupGuard } from '../../common/guards/setup.guard';
 import { GoogleStrategy } from './strategies/google.strategy';
 import { MailModule } from '../../common/mail/mail.module';
 import { WorkspacesModule } from '../workspaces/workspaces.module';
-import { EmailVerifiedGuard } from '../../guards/email-verified.guard';
 
 @Module({
   imports: [
@@ -45,12 +44,6 @@ import { EmailVerifiedGuard } from '../../guards/email-verified.guard';
     {
       provide: APP_GUARD,
       useClass: JwtAuthGuard,
-    },
-
-    // Global email-verified guard — runs after JwtAuthGuard, skips @Public() routes
-    {
-      provide: APP_GUARD,
-      useClass: EmailVerifiedGuard,
     },
 
     // Global throttler guard — enforces @Throttle() decorators app-wide

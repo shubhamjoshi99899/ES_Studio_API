@@ -5,7 +5,7 @@ import {
 import { DataSource } from 'typeorm';
 import { JwtService } from '@nestjs/jwt';
 import { Workspace } from './entities/workspace.entity';
-import { CreateWorkspaceDto } from './dto/create-workspace.dto';
+import { CreateWorkspaceDto } from '../auth/dto/create-workspace.dto';
 import { JwtPayload } from '../auth/auth.service';
 
 @Injectable()

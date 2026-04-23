@@ -85,19 +85,32 @@ export class MailService implements OnModuleInit {
   }
 
   async sendVerification(to: string, token: string): Promise<void> {
-    const appUrl = this.configService.get<string>('FRONTEND_URL') ?? 'http://localhost:3000';
-    const verifyUrl = `${appUrl}/verify-email?token=${encodeURIComponent(token)}`;
-    await this.sendMail({
-      to,
-      subject: 'Verify your SocialMetrics account',
-      html: `
-        <div style="font-family:Arial,sans-serif;line-height:1.5;color:#111827">
-          <h2>Verify your email</h2>
-          <p>Click the link below to verify your email. This link expires in 24 hours.</p>
-          <p><a href="${verifyUrl}">Verify my email</a></p>
-        </div>
-      `,
-    });
+    try {
+      if (!this.transporter) {
+        this.logger.warn(`Verification email skipped for ${to}: SMTP transporter is not configured`);
+        return;
+      }
+
+      const appUrl = this.configService.get<string>('APP_URL') ?? 'http://localhost:3000';
+      const verifyUrl = `${appUrl}/verify-email?token=${encodeURIComponent(token)}`;
+
+      await this.transporter.sendMail({
+        from: this.getFromAddress(),
+        to,
+        subject: 'Verify your SocialMetrics account',
+        html: `
+          <div style="font-family:Arial,sans-serif;line-height:1.5;color:#111827">
+            <h2>Verify your email</h2>
+            <p>Click the link below to verify your SocialMetrics account.</p>
+            <p><a href="${verifyUrl}">Verify your email</a></p>
+          </div>
+        `,
+      });
+    } catch (error) {
+      this.logger.error(
+        `Failed to send verification email to ${to}: ${this.getErrorMessage(error)}`,
+      );
+    }
   }
 
   async sendAlertEmail(to: string, alertName: string, metricSummary: string): Promise<void> {

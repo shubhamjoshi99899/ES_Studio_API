@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { APP_GUARD } from '@nestjs/core';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { BullModule } from '@nestjs/bull';
 import { ScheduleModule } from '@nestjs/schedule';
@@ -20,6 +21,8 @@ import { OpsAlertsModule } from './modules/ops/alerts/ops-alerts.module';
 import { InAppNotification } from './modules/ops/alerts/entities/in-app-notification.entity';
 import { InboxModule } from './modules/inbox/inbox.module';
 import { BillingModule } from './modules/billing/billing.module';
+import { User } from './modules/auth/entities/user.entity';
+import { EmailVerifiedGuard } from './guards/email-verified.guard';
 
 @Module({
   imports: [
@@ -47,7 +50,7 @@ import { BillingModule } from './modules/billing/billing.module';
         tls: process.env.REDIS_TLS === 'true' ? {} : undefined,
       },
     }),
-    TypeOrmModule.forFeature([InAppNotification]),
+    TypeOrmModule.forFeature([InAppNotification, User]),
     AuthModule,
     FacebookModule,
     UtmAnalyticsModule,
@@ -64,6 +67,12 @@ import { BillingModule } from './modules/billing/billing.module';
     BillingModule,
   ],
   controllers: [],
-  providers: [PostStatusChangedListener],
+  providers: [
+    PostStatusChangedListener,
+    {
+      provide: APP_GUARD,
+      useClass: EmailVerifiedGuard,
+    },
+  ],
 })
 export class AppModule {}

@@ -21,7 +21,7 @@ import { SetupGuard } from '../../common/guards/setup.guard';
 import { LoginDto } from './dto/login.dto';
 import { SetupAdminDto } from './dto/setup-admin.dto';
 import { RegisterDto } from './dto/register.dto';
-import { CreateWorkspaceDto } from '../workspaces/dto/create-workspace.dto';
+import { CreateWorkspaceDto } from './dto/create-workspace.dto';
 
 const ACCESS_TOKEN_TTL  = 15 * 60 * 1000;           // 15 minutes
 const REFRESH_TOKEN_TTL = 30 * 24 * 60 * 60 * 1000; // 30 days
