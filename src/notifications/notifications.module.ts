@@ -1,8 +1,10 @@
 import { Module } from '@nestjs/common';
+import { AuthModule } from '../modules/auth/auth.module';
 import { SseController } from './sse.controller';
 import { SseNotificationGateway } from './notification.gateway';
 
 @Module({
+  imports: [AuthModule],
   controllers: [SseController],
   providers: [
     {

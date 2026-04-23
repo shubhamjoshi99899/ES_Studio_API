@@ -2,12 +2,15 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { BullModule } from '@nestjs/bull';
 import { AuditModule } from '../../common/audit/audit.module';
+import { NotificationsModule } from '../../notifications/notifications.module';
+import { AuthModule } from '../auth/auth.module';
 
 import { InboxContact } from './entities/inbox-contact.entity';
 import { InboxThread } from './entities/inbox-thread.entity';
 import { InboxMessage } from './entities/inbox-message.entity';
 import { InboxNote } from './entities/inbox-note.entity';
 import { PlatformConnection } from './entities/platform-connection.entity';
+import { Workspace } from '../workspaces/entities/workspace.entity';
 
 import { MetaFacebookAdapter } from './adapters/meta-facebook.adapter';
 import { MetaInstagramAdapter } from './adapters/meta-instagram.adapter';
@@ -27,9 +30,12 @@ import { OpsInboxController } from './ops-inbox.controller';
       InboxMessage,
       InboxNote,
       PlatformConnection,
+      Workspace,
     ]),
     AuditModule,
     BullModule.registerQueue({ name: 'inbox-poll' }),
+    NotificationsModule,
+    AuthModule,
   ],
   controllers: [OpsInboxController],
   providers: [

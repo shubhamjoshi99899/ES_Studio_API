@@ -11,6 +11,7 @@ import { WorkspaceUser } from '../../workspaces/entities/workspace-user.entity';
 import { MailModule } from '../../../common/mail/mail.module';
 import { AuditModule } from '../../../common/audit/audit.module';
 import { NotificationsModule } from '../../../notifications/notifications.module';
+import { AuthModule } from '../../auth/auth.module';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { NotificationsModule } from '../../../notifications/notifications.module
     MailModule,
     AuditModule,
     NotificationsModule,
+    AuthModule,
   ],
   controllers: [OpsAlertsController],
   providers: [AlertEngineService, OpsAlertsService],

@@ -2,19 +2,31 @@
   "info": {
     "name": "ES Studio API",
     "_postman_id": "3d824e59-cc32-4d59-9a3c-e4c4f4f54baf",
-    "description": "Collection covering the current ES Studio API endpoints. Ops endpoints require a cookie token whose JWT payload includes `workspaceId`; the current `/api/auth/login` flow does not issue that claim yet.",
+    "description": "Module-by-module Postman collection generated from the current NestJS controllers on 2026-04-22.\n\nAuth model:\n- Protected routes read `access_token` from cookies only.\n- `POST /api/auth/login`, `POST /api/auth/refresh`, and `POST /api/auth/switch-workspace` include test scripts that capture `access_token` and `refresh_token` from `Set-Cookie` headers into collection variables.\n- `POST /api/auth/refresh` expects the `refresh_token` cookie.\n- Ops Inbox and Ops Alerts are plan-gated and require a `pro` or `enterprise` workspace.\n\nNotes:\n- File import endpoints use `form-data` with a `file` field.\n- Stripe webhook expects raw JSON plus a `stripe-signature` header.\n- SSE notifications use `text/event-stream` and keep the connection open.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
     { "key": "baseUrl", "value": "http://localhost:5000" },
     { "key": "setupSecret", "value": "change-me-setup-secret" },
-    { "key": "workspaceAccessToken", "value": "" },
+    { "key": "accessToken", "value": "" },
+    { "key": "refreshToken", "value": "" },
+    { "key": "workspaceId", "value": "00000000-0000-0000-0000-000000000010" },
     { "key": "profileId", "value": "1234567890" },
+    { "key": "secondaryProfileId", "value": "17841400000000000" },
+    { "key": "mappingId", "value": "1" },
+    { "key": "recipientId", "value": "1" },
+    { "key": "memberId", "value": "00000000-0000-0000-0000-000000000003" },
     { "key": "postId", "value": "00000000-0000-0000-0000-000000000001" },
     { "key": "campaignId", "value": "00000000-0000-0000-0000-000000000002" },
-    { "key": "memberId", "value": "00000000-0000-0000-0000-000000000003" },
-    { "key": "mappingId", "value": "1" },
-    { "key": "recipientId", "value": "1" }
+    { "key": "alertRuleId", "value": "00000000-0000-0000-0000-000000000004" },
+    { "key": "notificationId", "value": "00000000-0000-0000-0000-000000000008" },
+    { "key": "threadId", "value": "00000000-0000-0000-0000-000000000005" },
+    { "key": "contactId", "value": "00000000-0000-0000-0000-000000000006" },
+    { "key": "assigneeId", "value": "00000000-0000-0000-0000-000000000007" },
+    { "key": "priceId", "value": "price_1234567890" },
+    { "key": "successUrl", "value": "http://localhost:3000/billing/success" },
+    { "key": "cancelUrl", "value": "http://localhost:3000/billing/cancel" },
+    { "key": "stripeSignature", "value": "t=1234567890,v1=replace-with-real-signature" }
   ],
   "item": [
     {
@@ -42,13 +54,37 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"email\": \"admin@example.com\",\n  \"password\": \"StrongPass123\"\n}"
+              "raw": "{\n  \"email\": \"admin@example.com\",\n  \"password\": \"StrongPass123\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             },
             "url": "{{baseUrl}}/api/auth/setup"
           }
         },
         {
           "name": "POST /api/auth/login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const setCookieHeaders = pm.response.headers.all().filter(({ key }) => key.toLowerCase() === 'set-cookie').map(({ value }) => value);",
+                  "function saveCookie(cookieName, variableName) {",
+                  "  const header = setCookieHeaders.find((value) => value.startsWith(cookieName + '='));",
+                  "  if (!header) return;",
+                  "  const token = header.split(';')[0].slice(cookieName.length + 1);",
+                  "  pm.collectionVariables.set(variableName, token);",
+                  "}",
+                  "saveCookie('access_token', 'accessToken');",
+                  "saveCookie('refresh_token', 'refreshToken');"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "POST",
             "header": [
@@ -56,29 +92,187 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"email\": \"admin@example.com\",\n  \"password\": \"StrongPass123\"\n}"
+              "raw": "{\n  \"email\": \"admin@example.com\",\n  \"password\": \"StrongPass123\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             },
             "url": "{{baseUrl}}/api/auth/login"
           }
         },
         {
           "name": "POST /api/auth/refresh",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const setCookieHeaders = pm.response.headers.all().filter(({ key }) => key.toLowerCase() === 'set-cookie').map(({ value }) => value);",
+                  "function saveCookie(cookieName, variableName) {",
+                  "  const header = setCookieHeaders.find((value) => value.startsWith(cookieName + '='));",
+                  "  if (!header) return;",
+                  "  const token = header.split(';')[0].slice(cookieName.length + 1);",
+                  "  pm.collectionVariables.set(variableName, token);",
+                  "}",
+                  "saveCookie('access_token', 'accessToken');",
+                  "saveCookie('refresh_token', 'refreshToken');"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "POST",
+            "header": [
+              { "key": "Cookie", "value": "refresh_token={{refreshToken}}" }
+            ],
             "url": "{{baseUrl}}/api/auth/refresh"
           }
         },
         {
           "name": "POST /api/auth/logout",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.unset('accessToken');",
+                  "pm.collectionVariables.unset('refreshToken');"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "POST",
+            "header": [
+              { "key": "Cookie", "value": "access_token={{accessToken}}; refresh_token={{refreshToken}}" }
+            ],
             "url": "{{baseUrl}}/api/auth/logout"
+          }
+        },
+        {
+          "name": "GET /api/auth/me",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Cookie", "value": "access_token={{accessToken}}" }
+            ],
+            "url": "{{baseUrl}}/api/auth/me"
+          }
+        },
+        {
+          "name": "POST /api/auth/switch-workspace",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const setCookieHeaders = pm.response.headers.all().filter(({ key }) => key.toLowerCase() === 'set-cookie').map(({ value }) => value);",
+                  "function saveCookie(cookieName, variableName) {",
+                  "  const header = setCookieHeaders.find((value) => value.startsWith(cookieName + '='));",
+                  "  if (!header) return;",
+                  "  const token = header.split(';')[0].slice(cookieName.length + 1);",
+                  "  pm.collectionVariables.set(variableName, token);",
+                  "}",
+                  "saveCookie('access_token', 'accessToken');",
+                  "saveCookie('refresh_token', 'refreshToken');",
+                  "const json = pm.response.json();",
+                  "if (json.workspaceId) pm.collectionVariables.set('workspaceId', json.workspaceId);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Cookie", "value": "access_token={{accessToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"workspaceId\": \"{{workspaceId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/api/auth/switch-workspace"
           }
         }
       ]
     },
     {
-      "name": "Meta Auth",
+      "name": "Billing",
+      "item": [
+        {
+          "name": "POST /api/billing/checkout",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Cookie", "value": "access_token={{accessToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"priceId\": \"{{priceId}}\",\n  \"successUrl\": \"{{successUrl}}\",\n  \"cancelUrl\": \"{{cancelUrl}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/api/billing/checkout"
+          }
+        },
+        {
+          "name": "POST /api/billing/webhook",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "stripe-signature", "value": "{{stripeSignature}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"evt_test_webhook\",\n  \"type\": \"checkout.session.completed\",\n  \"data\": {\n    \"object\": {\n      \"id\": \"cs_test_123\"\n    }\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/api/billing/webhook"
+          }
+        },
+        {
+          "name": "GET /api/billing/subscription",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Cookie", "value": "access_token={{accessToken}}" }
+            ],
+            "url": "{{baseUrl}}/api/billing/subscription"
+          }
+        },
+        {
+          "name": "POST /api/billing/cancel",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Cookie", "value": "access_token={{accessToken}}" }
+            ],
+            "url": "{{baseUrl}}/api/billing/cancel"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Facebook Meta Auth",
       "item": [
         {
           "name": "POST /api/auth/meta/fetch-pages",
@@ -89,7 +283,12 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"shortLivedToken\": \"EAABsbCS1iHgBAKZCZA...\"\n}"
+              "raw": "{\n  \"shortLivedToken\": \"EAABsbCS1iHgBAKZCZA...\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             },
             "url": "{{baseUrl}}/api/auth/meta/fetch-pages"
           }
@@ -103,7 +302,12 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"selectedPages\": [\n    {\n      \"id\": \"1234567890\",\n      \"name\": \"ES Studio Page\",\n      \"access_token\": \"EAABsbCS1iHgBAKZCZA...\"\n    }\n  ],\n  \"selectedIgAccounts\": [\n    {\n      \"id\": \"17841400000000000\",\n      \"name\": \"esstudio\",\n      \"access_token\": \"EAABsbCS1iHgBAKZCZA...\"\n    }\n  ]\n}"
+              "raw": "{\n  \"selectedPages\": [\n    {\n      \"id\": \"1234567890\",\n      \"name\": \"ES Studio Page\",\n      \"access_token\": \"EAABsbCS1iHgBAKZCZA...\"\n    }\n  ],\n  \"selectedIgAccounts\": [\n    {\n      \"id\": \"17841400000000000\",\n      \"name\": \"esstudio\",\n      \"access_token\": \"EAABsbCS1iHgBAKZCZA...\"\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             },
             "url": "{{baseUrl}}/api/auth/meta/confirm-pages"
           }
@@ -117,7 +321,12 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"deleteData\": false,\n  \"platform\": \"all\"\n}"
+              "raw": "{\n  \"deleteData\": false,\n  \"platform\": \"all\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             },
             "url": "{{baseUrl}}/api/auth/meta/disconnect"
           }
@@ -132,7 +341,7 @@
       ]
     },
     {
-      "name": "Meta Analytics",
+      "name": "Facebook Analytics",
       "item": [
         {
           "name": "GET /api/analytics/profiles/list",
@@ -157,7 +366,12 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"profileIds\": [\"1234567890\", \"17841400000000000\"]\n}"
+              "raw": "{\n  \"profileIds\": [\"{{profileId}}\", \"{{secondaryProfileId}}\"]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             },
             "url": "{{baseUrl}}/api/analytics/demographics/aggregate"
           }
@@ -185,9 +399,33 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"profileIds\": [\"1234567890\", \"17841400000000000\"],\n  \"startDate\": \"2026-04-01\",\n  \"endDate\": \"2026-04-18\"\n}"
+              "raw": "{\n  \"profileIds\": [\"{{profileId}}\", \"{{secondaryProfileId}}\"],\n  \"startDate\": \"2026-04-01\",\n  \"endDate\": \"2026-04-18\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             },
             "url": "{{baseUrl}}/api/analytics/aggregate"
+          }
+        },
+        {
+          "name": "POST /api/analytics/aggregate/per-page",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"profileIds\": [\"{{profileId}}\", \"{{secondaryProfileId}}\"],\n  \"startDate\": \"2026-04-01\",\n  \"endDate\": \"2026-04-18\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/api/analytics/aggregate/per-page"
           }
         },
         {
@@ -199,7 +437,12 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"profileIds\": [\"1234567890\"],\n  \"startDate\": \"2026-04-01\",\n  \"endDate\": \"2026-04-18\"\n}"
+              "raw": "{\n  \"profileIds\": [\"{{profileId}}\"],\n  \"startDate\": \"2026-04-01\",\n  \"endDate\": \"2026-04-18\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             },
             "url": "{{baseUrl}}/api/analytics/posts"
           }
@@ -213,7 +456,12 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"days\": 30\n}"
+              "raw": "{\n  \"days\": 30\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             },
             "url": "{{baseUrl}}/api/analytics/profiles/{{profileId}}/sync"
           }
@@ -227,21 +475,21 @@
           "name": "GET /v1/analytics/utm/metrics",
           "request": {
             "method": "GET",
-            "url": "{{baseUrl}}/v1/analytics/utm/metrics?rollup=daily&startDate=2026-04-01&endDate=2026-04-18&utmSource=facebook&utmMedium=paid-social&utmCampaign=spring-launch"
+            "url": "{{baseUrl}}/v1/analytics/utm/metrics?rollup=daily&startDate=2026-04-01&endDate=2026-04-18&utmSource=facebook&utmSource=instagram&utmMedium=paid-social&utmCampaign=spring-launch"
           }
         },
         {
           "name": "GET /v1/analytics/headlines",
           "request": {
             "method": "GET",
-            "url": "{{baseUrl}}/v1/analytics/headlines?utmSource=facebook"
+            "url": "{{baseUrl}}/v1/analytics/headlines?utmSource=facebook&utmSource=instagram"
           }
         },
         {
           "name": "GET /v1/analytics/utm/metrics-aggregated",
           "request": {
             "method": "GET",
-            "url": "{{baseUrl}}/v1/analytics/utm/metrics-aggregated?startDate=2026-04-01&endDate=2026-04-18&utmSource=facebook"
+            "url": "{{baseUrl}}/v1/analytics/utm/metrics-aggregated?startDate=2026-04-01&endDate=2026-04-18&utmSource=facebook&utmMedium=paid-social&utmCampaign=spring-launch"
           }
         },
         {
@@ -269,13 +517,15 @@
           "name": "POST /v1/analytics/import/legacy",
           "request": {
             "method": "POST",
-            "header": [
-              { "key": "Content-Type", "value": "multipart/form-data" }
-            ],
+            "header": [],
             "body": {
               "mode": "formdata",
               "formdata": [
-                { "key": "file", "type": "file", "src": [] }
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": ""
+                }
               ]
             },
             "url": "{{baseUrl}}/v1/analytics/import/legacy"
@@ -309,7 +559,12 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"ids\": [1, 2, 3],\n  \"team\": \"growth\"\n}"
+              "raw": "{\n  \"ids\": [1, 2, 3],\n  \"team\": \"growth\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             },
             "url": "{{baseUrl}}/v1/revenue/mappings/batch/team"
           }
@@ -323,7 +578,12 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"team\": \"growth\"\n}"
+              "raw": "{\n  \"team\": \"growth\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             },
             "url": "{{baseUrl}}/v1/revenue/mappings/{{mappingId}}"
           }
@@ -349,7 +609,12 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"email\": \"ops@example.com\"\n}"
+              "raw": "{\n  \"email\": \"ops@example.com\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             },
             "url": "{{baseUrl}}/v1/email-reports/recipients"
           }
@@ -389,7 +654,12 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"category\": \"Sports\",\n  \"team\": \"growth\",\n  \"platform\": \"facebook\",\n  \"pageName\": \"ES Studio Page\",\n  \"utmSource\": \"facebook\",\n  \"utmMediums\": [\"paid-social\", \"organic-social\"]\n}"
+              "raw": "{\n  \"category\": \"Sports\",\n  \"team\": \"growth\",\n  \"platform\": \"facebook\",\n  \"pageName\": \"ES Studio Page\",\n  \"utmSource\": \"facebook\",\n  \"utmMediums\": [\"paid-social\", \"organic-social\"]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             },
             "url": "{{baseUrl}}/page-mappings"
           }
@@ -403,7 +673,12 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"ids\": [1, 2, 3],\n  \"team\": \"growth\"\n}"
+              "raw": "{\n  \"ids\": [1, 2, 3],\n  \"team\": \"growth\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             },
             "url": "{{baseUrl}}/page-mappings/batch/team"
           }
@@ -417,7 +692,12 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"team\": \"growth\"\n}"
+              "raw": "{\n  \"category\": \"Sports\",\n  \"team\": \"growth\",\n  \"platform\": \"facebook\",\n  \"pageName\": \"ES Studio Page\",\n  \"utmSource\": \"facebook\",\n  \"utmMediums\": [\"paid-social\", \"organic-social\"]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             },
             "url": "{{baseUrl}}/page-mappings/{{mappingId}}"
           }
@@ -433,13 +713,14 @@
           "name": "POST /page-mappings/import",
           "request": {
             "method": "POST",
-            "header": [
-              { "key": "Content-Type", "value": "multipart/form-data" }
-            ],
             "body": {
               "mode": "formdata",
               "formdata": [
-                { "key": "file", "type": "file", "src": [] }
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": ""
+                }
               ]
             },
             "url": "{{baseUrl}}/page-mappings/import"
@@ -449,14 +730,13 @@
     },
     {
       "name": "Ops Team",
-      "description": "Set `workspaceAccessToken` to a JWT that contains `workspaceId`, then use these requests. The current login flow does not create a workspace-aware token yet.",
       "item": [
         {
           "name": "GET /api/ops/team/members",
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Cookie", "value": "access_token={{workspaceAccessToken}}" }
+              { "key": "Cookie", "value": "access_token={{accessToken}}" }
             ],
             "url": "{{baseUrl}}/api/ops/team/members"
           }
@@ -467,11 +747,16 @@
             "method": "POST",
             "header": [
               { "key": "Content-Type", "value": "application/json" },
-              { "key": "Cookie", "value": "access_token={{workspaceAccessToken}}" }
+              { "key": "Cookie", "value": "access_token={{accessToken}}" }
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"email\": \"analyst@example.com\",\n  \"role\": \"analyst\"\n}"
+              "raw": "{\n  \"email\": \"analyst@example.com\",\n  \"role\": \"analyst\",\n  \"actorId\": \"{{memberId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             },
             "url": "{{baseUrl}}/api/ops/team/invites"
           }
@@ -482,11 +767,16 @@
             "method": "PATCH",
             "header": [
               { "key": "Content-Type", "value": "application/json" },
-              { "key": "Cookie", "value": "access_token={{workspaceAccessToken}}" }
+              { "key": "Cookie", "value": "access_token={{accessToken}}" }
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"role\": \"content_manager\"\n}"
+              "raw": "{\n  \"role\": \"content_manager\",\n  \"actorId\": \"{{memberId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             },
             "url": "{{baseUrl}}/api/ops/team/members/{{memberId}}/role"
           }
@@ -496,7 +786,7 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Cookie", "value": "access_token={{workspaceAccessToken}}" }
+              { "key": "Cookie", "value": "access_token={{accessToken}}" }
             ],
             "url": "{{baseUrl}}/api/ops/team/audit-log?page=1&limit=20"
           }
@@ -505,7 +795,6 @@
     },
     {
       "name": "Ops Schedule",
-      "description": "Requires a workspace-aware cookie token in `workspaceAccessToken`.",
       "item": [
         {
           "name": "POST /api/ops/schedule/posts",
@@ -513,11 +802,16 @@
             "method": "POST",
             "header": [
               { "key": "Content-Type", "value": "application/json" },
-              { "key": "Cookie", "value": "access_token={{workspaceAccessToken}}" }
+              { "key": "Cookie", "value": "access_token={{accessToken}}" }
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"title\": \"Launch teaser\",\n  \"description\": \"Short teaser post\",\n  \"platform\": \"instagram\",\n  \"ownerId\": \"00000000-0000-0000-0000-000000000010\"\n}"
+              "raw": "{\n  \"title\": \"IPL Matchday Promo\",\n  \"caption\": \"Watch tonight's fixture live.\",\n  \"hashtags\": [\"#IPL\", \"#Matchday\"],\n  \"platforms\": [\"facebook\", \"instagram\"],\n  \"mediaType\": \"image\",\n  \"ownerId\": \"{{memberId}}\",\n  \"approvalOwner\": \"{{memberId}}\",\n  \"campaignId\": \"{{campaignId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             },
             "url": "{{baseUrl}}/api/ops/schedule/posts"
           }
@@ -527,7 +821,7 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Cookie", "value": "access_token={{workspaceAccessToken}}" }
+              { "key": "Cookie", "value": "access_token={{accessToken}}" }
             ],
             "url": "{{baseUrl}}/api/ops/schedule/posts"
           }
@@ -537,7 +831,7 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Cookie", "value": "access_token={{workspaceAccessToken}}" }
+              { "key": "Cookie", "value": "access_token={{accessToken}}" }
             ],
             "url": "{{baseUrl}}/api/ops/schedule/posts/{{postId}}"
           }
@@ -548,11 +842,16 @@
             "method": "PATCH",
             "header": [
               { "key": "Content-Type", "value": "application/json" },
-              { "key": "Cookie", "value": "access_token={{workspaceAccessToken}}" }
+              { "key": "Cookie", "value": "access_token={{accessToken}}" }
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"title\": \"Launch teaser updated\"\n}"
+              "raw": "{\n  \"title\": \"IPL Matchday Promo Updated\",\n  \"caption\": \"Updated post copy.\",\n  \"hashtags\": [\"#IPL\", \"#LiveCricket\"],\n  \"platforms\": [\"facebook\", \"instagram\"],\n  \"mediaType\": \"image\",\n  \"actorId\": \"{{memberId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             },
             "url": "{{baseUrl}}/api/ops/schedule/posts/{{postId}}"
           }
@@ -562,7 +861,7 @@
           "request": {
             "method": "DELETE",
             "header": [
-              { "key": "Cookie", "value": "access_token={{workspaceAccessToken}}" }
+              { "key": "Cookie", "value": "access_token={{accessToken}}" }
             ],
             "url": "{{baseUrl}}/api/ops/schedule/posts/{{postId}}"
           }
@@ -572,7 +871,7 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Cookie", "value": "access_token={{workspaceAccessToken}}" }
+              { "key": "Cookie", "value": "access_token={{accessToken}}" }
             ],
             "url": "{{baseUrl}}/api/ops/schedule/posts/{{postId}}/submit-for-review"
           }
@@ -583,11 +882,16 @@
             "method": "POST",
             "header": [
               { "key": "Content-Type", "value": "application/json" },
-              { "key": "Cookie", "value": "access_token={{workspaceAccessToken}}" }
+              { "key": "Cookie", "value": "access_token={{accessToken}}" }
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"reviewerId\": \"00000000-0000-0000-0000-000000000011\",\n  \"note\": \"Looks good\"\n}"
+              "raw": "{\n  \"reviewerId\": \"{{memberId}}\",\n  \"note\": \"Looks good to publish.\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             },
             "url": "{{baseUrl}}/api/ops/schedule/posts/{{postId}}/approve"
           }
@@ -598,11 +902,16 @@
             "method": "POST",
             "header": [
               { "key": "Content-Type", "value": "application/json" },
-              { "key": "Cookie", "value": "access_token={{workspaceAccessToken}}" }
+              { "key": "Cookie", "value": "access_token={{accessToken}}" }
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"reviewerId\": \"00000000-0000-0000-0000-000000000011\",\n  \"note\": \"Needs edits\"\n}"
+              "raw": "{\n  \"reviewerId\": \"{{memberId}}\",\n  \"note\": \"Please revise the caption before approval.\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             },
             "url": "{{baseUrl}}/api/ops/schedule/posts/{{postId}}/reject"
           }
@@ -613,11 +922,16 @@
             "method": "POST",
             "header": [
               { "key": "Content-Type", "value": "application/json" },
-              { "key": "Cookie", "value": "access_token={{workspaceAccessToken}}" }
+              { "key": "Cookie", "value": "access_token={{accessToken}}" }
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"scheduledAt\": \"2026-05-01T10:00:00.000Z\"\n}"
+              "raw": "{\n  \"scheduledAt\": \"2026-05-01T10:30:00.000Z\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             },
             "url": "{{baseUrl}}/api/ops/schedule/posts/{{postId}}/schedule"
           }
@@ -626,7 +940,6 @@
     },
     {
       "name": "Ops Campaigns",
-      "description": "Requires a workspace-aware cookie token in `workspaceAccessToken`.",
       "item": [
         {
           "name": "POST /api/ops/campaigns",
@@ -634,11 +947,16 @@
             "method": "POST",
             "header": [
               { "key": "Content-Type", "value": "application/json" },
-              { "key": "Cookie", "value": "access_token={{workspaceAccessToken}}" }
+              { "key": "Cookie", "value": "access_token={{accessToken}}" }
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"Spring Launch\",\n  \"description\": \"Campaign for launch week\"\n}"
+              "raw": "{\n  \"name\": \"IPL Retention Push\",\n  \"objective\": \"Drive engagement on matchday posts\",\n  \"status\": \"draft\",\n  \"platforms\": [\"facebook\", \"instagram\"],\n  \"budget\": 15000,\n  \"spend\": 0,\n  \"startDate\": \"2026-04-20\",\n  \"endDate\": \"2026-05-20\",\n  \"actorId\": \"{{memberId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             },
             "url": "{{baseUrl}}/api/ops/campaigns"
           }
@@ -648,7 +966,7 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Cookie", "value": "access_token={{workspaceAccessToken}}" }
+              { "key": "Cookie", "value": "access_token={{accessToken}}" }
             ],
             "url": "{{baseUrl}}/api/ops/campaigns"
           }
@@ -658,7 +976,7 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Cookie", "value": "access_token={{workspaceAccessToken}}" }
+              { "key": "Cookie", "value": "access_token={{accessToken}}" }
             ],
             "url": "{{baseUrl}}/api/ops/campaigns/{{campaignId}}"
           }
@@ -669,11 +987,16 @@
             "method": "PATCH",
             "header": [
               { "key": "Content-Type", "value": "application/json" },
-              { "key": "Cookie", "value": "access_token={{workspaceAccessToken}}" }
+              { "key": "Cookie", "value": "access_token={{accessToken}}" }
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"Spring Launch Updated\"\n}"
+              "raw": "{\n  \"name\": \"IPL Retention Push Updated\",\n  \"objective\": \"Drive engagement and reach\",\n  \"status\": \"active\",\n  \"platforms\": [\"facebook\", \"instagram\"],\n  \"budget\": 20000,\n  \"spend\": 5000,\n  \"startDate\": \"2026-04-20\",\n  \"endDate\": \"2026-05-25\",\n  \"actorId\": \"{{memberId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             },
             "url": "{{baseUrl}}/api/ops/campaigns/{{campaignId}}"
           }
@@ -683,7 +1006,7 @@
           "request": {
             "method": "DELETE",
             "header": [
-              { "key": "Cookie", "value": "access_token={{workspaceAccessToken}}" }
+              { "key": "Cookie", "value": "access_token={{accessToken}}" }
             ],
             "url": "{{baseUrl}}/api/ops/campaigns/{{campaignId}}"
           }
@@ -693,7 +1016,7 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Cookie", "value": "access_token={{workspaceAccessToken}}" }
+              { "key": "Cookie", "value": "access_token={{accessToken}}" }
             ],
             "url": "{{baseUrl}}/api/ops/campaigns/{{campaignId}}/posts/{{postId}}"
           }
@@ -703,9 +1026,246 @@
           "request": {
             "method": "DELETE",
             "header": [
-              { "key": "Cookie", "value": "access_token={{workspaceAccessToken}}" }
+              { "key": "Cookie", "value": "access_token={{accessToken}}" }
             ],
             "url": "{{baseUrl}}/api/ops/campaigns/{{campaignId}}/posts/{{postId}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Ops Alerts",
+      "item": [
+        {
+          "name": "GET /api/ops/alerts/rules",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Cookie", "value": "access_token={{accessToken}}" }
+            ],
+            "url": "{{baseUrl}}/api/ops/alerts/rules"
+          }
+        },
+        {
+          "name": "POST /api/ops/alerts/rules",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Cookie", "value": "access_token={{accessToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Traffic drop 30%\",\n  \"metric_family\": \"traffic\",\n  \"operator\": \"pct_drop\",\n  \"threshold\": 30,\n  \"time_window\": \"7d\",\n  \"channels\": [\"email\", \"in_app\"],\n  \"enabled\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/api/ops/alerts/rules"
+          }
+        },
+        {
+          "name": "PATCH /api/ops/alerts/rules/:id",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Cookie", "value": "access_token={{accessToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Traffic drop 20%\",\n  \"threshold\": 20,\n  \"channels\": [\"in_app\"],\n  \"enabled\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/api/ops/alerts/rules/{{alertRuleId}}"
+          }
+        },
+        {
+          "name": "DELETE /api/ops/alerts/rules/:id",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Cookie", "value": "access_token={{accessToken}}" }
+            ],
+            "url": "{{baseUrl}}/api/ops/alerts/rules/{{alertRuleId}}"
+          }
+        },
+        {
+          "name": "GET /api/ops/alerts/insights",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Cookie", "value": "access_token={{accessToken}}" }
+            ],
+            "url": "{{baseUrl}}/api/ops/alerts/insights?limit=10&type=traffic"
+          }
+        },
+        {
+          "name": "GET /api/ops/notifications",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Cookie", "value": "access_token={{accessToken}}" }
+            ],
+            "url": "{{baseUrl}}/api/ops/notifications?page=1&limit=20&status=unread"
+          }
+        },
+        {
+          "name": "PATCH /api/ops/notifications/:id/read",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Cookie", "value": "access_token={{accessToken}}" }
+            ],
+            "url": "{{baseUrl}}/api/ops/notifications/{{notificationId}}/read"
+          }
+        },
+        {
+          "name": "POST /api/ops/notifications/read-all",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Cookie", "value": "access_token={{accessToken}}" }
+            ],
+            "url": "{{baseUrl}}/api/ops/notifications/read-all"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Inbox",
+      "item": [
+        {
+          "name": "GET /api/ops/inbox/threads",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Cookie", "value": "access_token={{accessToken}}" }
+            ],
+            "url": "{{baseUrl}}/api/ops/inbox/threads?status=open&platform=instagram&page=1&limit=20"
+          }
+        },
+        {
+          "name": "GET /api/ops/inbox/threads/:id",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Cookie", "value": "access_token={{accessToken}}" }
+            ],
+            "url": "{{baseUrl}}/api/ops/inbox/threads/{{threadId}}"
+          }
+        },
+        {
+          "name": "PATCH /api/ops/inbox/threads/:id",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Cookie", "value": "access_token={{accessToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"pending\",\n  \"assignedTo\": \"{{assigneeId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/api/ops/inbox/threads/{{threadId}}"
+          }
+        },
+        {
+          "name": "GET /api/ops/inbox/threads/:id/messages",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Cookie", "value": "access_token={{accessToken}}" }
+            ],
+            "url": "{{baseUrl}}/api/ops/inbox/threads/{{threadId}}/messages"
+          }
+        },
+        {
+          "name": "POST /api/ops/inbox/threads/:id/reply",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Cookie", "value": "access_token={{accessToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"body\": \"Thanks for reaching out. We will get back to you shortly.\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/api/ops/inbox/threads/{{threadId}}/reply"
+          }
+        },
+        {
+          "name": "POST /api/ops/inbox/threads/:id/notes",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Cookie", "value": "access_token={{accessToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"body\": \"Customer prefers follow-up over email next week.\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/api/ops/inbox/threads/{{threadId}}/notes"
+          }
+        },
+        {
+          "name": "GET /api/ops/inbox/contacts",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Cookie", "value": "access_token={{accessToken}}" }
+            ],
+            "url": "{{baseUrl}}/api/ops/inbox/contacts"
+          }
+        },
+        {
+          "name": "GET /api/ops/inbox/contacts/:id",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Cookie", "value": "access_token={{accessToken}}" }
+            ],
+            "url": "{{baseUrl}}/api/ops/inbox/contacts/{{contactId}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Notifications SSE",
+      "item": [
+        {
+          "name": "GET /api/ops/notifications/stream",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "text/event-stream" },
+              { "key": "Cache-Control", "value": "no-cache" },
+              { "key": "Cookie", "value": "access_token={{accessToken}}" }
+            ],
+            "url": "{{baseUrl}}/api/ops/notifications/stream"
           }
         }
       ]

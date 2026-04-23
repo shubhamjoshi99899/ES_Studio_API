@@ -7,12 +7,14 @@ import { WorkspaceInvite } from '../../workspaces/entities/workspace-invite.enti
 import { AuditLog } from '../../../common/audit/audit-log.entity';
 import { AuditModule } from '../../../common/audit/audit.module';
 import { MailModule } from '../../../common/mail/mail.module';
+import { AuthModule } from '../../auth/auth.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([WorkspaceUser, WorkspaceInvite, AuditLog]),
     AuditModule,
     MailModule,
+    AuthModule,
   ],
   controllers: [OpsTeamController],
   providers: [OpsTeamService],

@@ -7,11 +7,13 @@ import { CampaignPostLink } from './entities/campaign-post-link.entity';
 import { ContentPost } from '../schedule/entities/content-post.entity';
 import { ContentPostProfile } from './entities/content-post-profile.entity';
 import { AuditModule } from '../../../common/audit/audit.module';
+import { AuthModule } from '../../auth/auth.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([Campaign, CampaignPostLink, ContentPost, ContentPostProfile]),
     AuditModule,
+    AuthModule,
   ],
   controllers: [OpsCampaignsController],
   providers: [OpsCampaignsService],
