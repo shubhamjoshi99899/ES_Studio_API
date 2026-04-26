@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { Strategy, VerifyCallback } from 'passport-google-oauth20';
 import { ConfigService } from '@nestjs/config';
@@ -6,12 +6,30 @@ import { ConfigService } from '@nestjs/config';
 @Injectable()
 export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
   constructor(private config: ConfigService) {
+    const clientID = config.get<string>('GOOGLE_CLIENT_ID')?.trim();
+    const clientSecret = config.get<string>('GOOGLE_CLIENT_SECRET')?.trim();
+    const callbackURL =
+      config.get<string>('GOOGLE_CALLBACK_URL')?.trim()
+      ?? 'http://localhost:5000/api/auth/google/callback';
+    const missing = [
+      !clientID ? 'GOOGLE_CLIENT_ID' : null,
+      !clientSecret ? 'GOOGLE_CLIENT_SECRET' : null,
+    ]
+      .filter(Boolean)
+      .join(', ');
+
     super({
-      clientID: config.get<string>('GOOGLE_CLIENT_ID', ''),
-      clientSecret: config.get<string>('GOOGLE_CLIENT_SECRET', ''),
-      callbackURL: config.get<string>('GOOGLE_CALLBACK_URL', ''),
+      clientID: clientID || 'google-oauth-disabled',
+      clientSecret: clientSecret || 'google-oauth-disabled',
+      callbackURL,
       scope: ['email', 'profile'],
     });
+
+    if (!clientID || !clientSecret) {
+      new Logger(GoogleStrategy.name).warn(
+        `Google OAuth is not fully configured. Missing: ${missing}. Google auth routes will not work until these env vars are set.`,
+      );
+    }
   }
 
   validate(

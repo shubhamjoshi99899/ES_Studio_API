@@ -13,10 +13,10 @@ export class User {
   @Column({ unique: true })
   email: string;
 
-  @Column({ nullable: true })
+  @Column({ type: 'text', nullable: true })
   passwordHash: string | null;
 
-  @Column({ unique: true, nullable: true })
+  @Column({ type: 'text', unique: true, nullable: true })
   apiKey: string | null;
 
   @Column({ name: 'google_id', type: 'text', unique: true, nullable: true })
@@ -25,7 +25,7 @@ export class User {
   @Column({ name: 'avatar_url', type: 'text', nullable: true })
   avatarUrl: string | null;
 
-  @Column({ name: 'email_verified', default: false })
+  @Column({ name: 'email_verified', type: 'boolean', default: false })
   emailVerified: boolean;
 
   @Column({ name: 'verification_token', type: 'text', unique: true, nullable: true })

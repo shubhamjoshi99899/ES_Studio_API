@@ -22,6 +22,7 @@ import { LoginDto } from './dto/login.dto';
 import { SetupAdminDto } from './dto/setup-admin.dto';
 import { RegisterDto } from './dto/register.dto';
 import { CreateWorkspaceDto } from './dto/create-workspace.dto';
+import { GoogleOAuthConfigGuard } from './google-oauth-config.guard';
 
 const ACCESS_TOKEN_TTL  = 15 * 60 * 1000;           // 15 minutes
 const REFRESH_TOKEN_TTL = 30 * 24 * 60 * 60 * 1000; // 30 days
@@ -219,14 +220,14 @@ export class AuthController {
   // ── GET /api/auth/google ──────────────────────────────────────────────────
 
   @Public()
-  @UseGuards(AuthGuard('google'))
+  @UseGuards(GoogleOAuthConfigGuard, AuthGuard('google'))
   @Get('google')
   googleLogin() {
     // Passport intercepts and redirects to Google consent screen
   }
 
   @Public()
-  @UseGuards(AuthGuard('google'))
+  @UseGuards(GoogleOAuthConfigGuard, AuthGuard('google'))
   @Get('google/callback')
   async googleCallback(@Req() req: Request, @Res() res: Response) {
     try {

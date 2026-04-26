@@ -44,6 +44,9 @@ export class PlatformConnection {
   })
   status: PlatformConnectionStatus;
 
+  @Column({ name: 'token_expires_at', type: 'timestamp', nullable: true })
+  tokenExpiresAt: Date | null;
+
   @Column({ name: 'last_synced_at', type: 'timestamp', nullable: true })
   lastSyncedAt: Date | null;
 

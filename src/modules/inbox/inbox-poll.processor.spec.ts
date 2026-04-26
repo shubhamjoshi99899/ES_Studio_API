@@ -227,19 +227,21 @@ describe('InboxPollProcessor', () => {
     expect(result.externalMessageId).toBe('reply-msg-001');
   });
 
-  // ── LinkedIn adapter throws Phase 3.5 error cleanly ────────────────────
+  // ── LinkedIn adapter Phase 4 — throws PlatformAuthException when no connection row ──
 
-  it('LinkedIn adapter throws "not implemented — Phase 3.5" on fetchThreads', async () => {
-    const li = new LinkedInAdapter();
+  it('LinkedIn adapter throws PlatformAuthException on fetchThreads when no connection exists', async () => {
+    const mockDs = { query: jest.fn().mockResolvedValue([]) } as unknown as DataSource;
+    const li = new LinkedInAdapter(mockDs);
     await expect(li.fetchThreads('profile-123', new Date())).rejects.toThrow(
-      'LinkedIn adapter not implemented — Phase 3.5',
+      'No active LinkedIn connection for profile profile-123',
     );
   });
 
-  it('LinkedIn adapter throws "not implemented — Phase 3.5" on sendReply', async () => {
-    const li = new LinkedInAdapter();
+  it('LinkedIn adapter throws PlatformAuthException on sendReply when no connection exists', async () => {
+    const mockDs = { query: jest.fn().mockResolvedValue([]) } as unknown as DataSource;
+    const li = new LinkedInAdapter(mockDs);
     await expect(li.sendReply('thread-123', 'hello')).rejects.toThrow(
-      'LinkedIn adapter not implemented — Phase 3.5',
+      'No active LinkedIn connection',
     );
   });
 });

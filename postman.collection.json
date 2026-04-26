@@ -2,7 +2,7 @@
   "info": {
     "name": "ES Studio API",
     "_postman_id": "3d824e59-cc32-4d59-9a3c-e4c4f4f54baf",
-    "description": "Module-by-module Postman collection generated from the current NestJS controllers on 2026-04-22.\n\nAuth model:\n- Protected routes read `access_token` from cookies only.\n- `POST /api/auth/login`, `POST /api/auth/refresh`, and `POST /api/auth/switch-workspace` include test scripts that capture `access_token` and `refresh_token` from `Set-Cookie` headers into collection variables.\n- `POST /api/auth/refresh` expects the `refresh_token` cookie.\n- Ops Inbox and Ops Alerts are plan-gated and require a `pro` or `enterprise` workspace.\n\nNotes:\n- File import endpoints use `form-data` with a `file` field.\n- Stripe webhook expects raw JSON plus a `stripe-signature` header.\n- SSE notifications use `text/event-stream` and keep the connection open.",
+    "description": "Module-by-module Postman collection generated from the current NestJS controllers on 2026-04-24.\n\nAuth model:\n- Protected routes read `access_token` from cookies only.\n- `POST /api/auth/login`, `POST /api/auth/refresh`, `GET /api/auth/verify-email`, `GET /api/auth/google/callback`, `POST /api/auth/workspace/create`, and `POST /api/auth/switch-workspace` include test scripts that capture `access_token` and `refresh_token` from `Set-Cookie` headers into collection variables when present.\n- `POST /api/auth/refresh` expects the `refresh_token` cookie.\n- `POST /api/auth/workspace/create` expects an authenticated user whose JWT currently has `workspaceId = null`.\n- Ops Inbox and Ops Alerts are plan-gated and require a `pro` or `enterprise` workspace.\n\nNotes:\n- File import endpoints use `form-data` with a `file` field.\n- Stripe webhook expects raw JSON plus a `stripe-signature` header.\n- SSE notifications use `text/event-stream` and keep the connection open.\n- Google OAuth endpoints are browser-oriented redirects. In Postman, use them mainly to inspect redirect behavior rather than complete the external consent flow.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -10,7 +10,13 @@
     { "key": "setupSecret", "value": "change-me-setup-secret" },
     { "key": "accessToken", "value": "" },
     { "key": "refreshToken", "value": "" },
+    { "key": "verificationToken", "value": "replace-with-email-token" },
     { "key": "workspaceId", "value": "00000000-0000-0000-0000-000000000010" },
+    { "key": "orgName", "value": "Acme Social" },
+    { "key": "workspaceSlug", "value": "acme-social" },
+    { "key": "teamSize", "value": "6-20" },
+    { "key": "industry", "value": "agency" },
+    { "key": "googleAuthCode", "value": "replace-with-google-oauth-code" },
     { "key": "profileId", "value": "1234567890" },
     { "key": "secondaryProfileId", "value": "17841400000000000" },
     { "key": "mappingId", "value": "1" },
@@ -45,6 +51,25 @@
       "name": "Auth",
       "item": [
         {
+          "name": "POST /api/auth/register",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"newuser@example.com\",\n  \"password\": \"StrongPass123\",\n  \"name\": \"New User\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/api/auth/register"
+          }
+        },
+        {
           "name": "POST /api/auth/setup",
           "request": {
             "method": "POST",
@@ -62,6 +87,48 @@
               }
             },
             "url": "{{baseUrl}}/api/auth/setup"
+          }
+        },
+        {
+          "name": "GET /api/auth/google",
+          "request": {
+            "method": "GET",
+            "description": "Starts the Google OAuth redirect flow. Run from Postman only to inspect the redirect target.",
+            "url": "{{baseUrl}}/api/auth/google"
+          }
+        },
+        {
+          "name": "GET /api/auth/google/callback",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const setCookieHeaders = pm.response.headers.all().filter(({ key }) => key.toLowerCase() === 'set-cookie').map(({ value }) => value);",
+                  "function saveCookie(cookieName, variableName) {",
+                  "  const header = setCookieHeaders.find((value) => value.startsWith(cookieName + '='));",
+                  "  if (!header) return;",
+                  "  const token = header.split(';')[0].slice(cookieName.length + 1);",
+                  "  pm.collectionVariables.set(variableName, token);",
+                  "}",
+                  "saveCookie('access_token', 'accessToken');",
+                  "saveCookie('refresh_token', 'refreshToken');"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "description": "Browser-oriented endpoint. Requires a real Google OAuth callback query. Use only for manual redirect inspection with a valid `code`.",
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/google/callback?code={{googleAuthCode}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "google", "callback"],
+              "query": [
+                { "key": "code", "value": "{{googleAuthCode}}" }
+              ]
+            }
           }
         },
         {
@@ -100,6 +167,40 @@
               }
             },
             "url": "{{baseUrl}}/api/auth/login"
+          }
+        },
+        {
+          "name": "GET /api/auth/verify-email",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const setCookieHeaders = pm.response.headers.all().filter(({ key }) => key.toLowerCase() === 'set-cookie').map(({ value }) => value);",
+                  "function saveCookie(cookieName, variableName) {",
+                  "  const header = setCookieHeaders.find((value) => value.startsWith(cookieName + '='));",
+                  "  if (!header) return;",
+                  "  const token = header.split(';')[0].slice(cookieName.length + 1);",
+                  "  pm.collectionVariables.set(variableName, token);",
+                  "}",
+                  "saveCookie('access_token', 'accessToken');",
+                  "saveCookie('refresh_token', 'refreshToken');"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "description": "Use the verification token delivered by email. Successful responses set an `access_token` cookie and redirect to the frontend onboarding route.",
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/verify-email?token={{verificationToken}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "verify-email"],
+              "query": [
+                { "key": "token", "value": "{{verificationToken}}" }
+              ]
+            }
           }
         },
         {
@@ -161,6 +262,47 @@
               { "key": "Cookie", "value": "access_token={{accessToken}}" }
             ],
             "url": "{{baseUrl}}/api/auth/me"
+          }
+        },
+        {
+          "name": "POST /api/auth/workspace/create",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const setCookieHeaders = pm.response.headers.all().filter(({ key }) => key.toLowerCase() === 'set-cookie').map(({ value }) => value);",
+                  "function saveCookie(cookieName, variableName) {",
+                  "  const header = setCookieHeaders.find((value) => value.startsWith(cookieName + '='));",
+                  "  if (!header) return;",
+                  "  const token = header.split(';')[0].slice(cookieName.length + 1);",
+                  "  pm.collectionVariables.set(variableName, token);",
+                  "}",
+                  "saveCookie('access_token', 'accessToken');",
+                  "saveCookie('refresh_token', 'refreshToken');",
+                  "const json = pm.response.json();",
+                  "if (json.workspaceId) pm.collectionVariables.set('workspaceId', json.workspaceId);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Cookie", "value": "access_token={{accessToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"orgName\": \"{{orgName}}\",\n  \"slug\": \"{{workspaceSlug}}\",\n  \"teamSize\": \"{{teamSize}}\",\n  \"industry\": \"{{industry}}\",\n  \"platforms\": [\"facebook\", \"instagram\", \"linkedin\"]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/api/auth/workspace/create"
           }
         },
         {

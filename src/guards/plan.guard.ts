@@ -2,6 +2,7 @@ import {
   CanActivate,
   ExecutionContext,
   ForbiddenException,
+  HttpException,
   Injectable,
   mixin,
   Type,
@@ -9,7 +10,8 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import Redis from 'ioredis';
-import { Workspace, WorkspacePlan } from '../modules/workspaces/entities/workspace.entity';
+import { WorkspacePlan } from '../modules/workspaces/entities/workspace.entity';
+import { WorkspaceSubscription } from '../modules/billing/entities/workspace-subscription.entity';
 import type { JwtPayload } from '../modules/auth/auth.service';
 
 // ── Feature map ────────────────────────────────────────────────────────────
@@ -21,13 +23,13 @@ const PLAN_FEATURES: Record<WorkspacePlan, string[] | ['*']> = {
 };
 
 const REDIS_TTL_SECONDS = 300; // 5 minutes
-const CACHE_KEY = (workspaceId: string) => `plan:${workspaceId}`;
+const SUB_CACHE_KEY = (workspaceId: string) => `sub:${workspaceId}`;
 
 // ── Shared Redis client (lazy singleton) ───────────────────────────────────
 
 let redisClient: Redis | null = null;
 
-function getRedis(): Redis {
+export function getRedis(): Redis {
   if (!redisClient) {
     redisClient = new Redis({
       host:     process.env.REDIS_HOST     || 'localhost',
@@ -47,11 +49,16 @@ export function planAllowsFeature(plan: WorkspacePlan, feature: string): boolean
   return allowed[0] === '*' || (allowed as string[]).includes(feature);
 }
 
+// ── Cached subscription shape ─────────────────────────────────────────────
+
+type CachedSubscription = { plan: WorkspacePlan; status: string };
+
 // ── Guard factory ─────────────────────────────────────────────────────────
 
 /**
- * Returns a guard class that denies access when the workspace's plan does not
- * include `featureKey`. The workspace plan is cached in Redis for 5 minutes.
+ * Returns a guard class that enforces feature access based on the workspace's
+ * live subscription from workspace_subscriptions (source of truth). Subscription
+ * data is cached in Redis under key sub:{workspaceId} for 5 minutes.
  *
  * Usage:
  *   @UseGuards(PlanGuard('automation'))
@@ -62,21 +69,46 @@ export function PlanGuard(featureKey: string): Type<CanActivate> {
   @Injectable()
   class PlanGuardMixin implements CanActivate {
     constructor(
-      @InjectRepository(Workspace)
-      private readonly workspaceRepo: Repository<Workspace>,
+      @InjectRepository(WorkspaceSubscription)
+      private readonly subRepo: Repository<WorkspaceSubscription>,
     ) {}
 
     async canActivate(context: ExecutionContext): Promise<boolean> {
-      const request = context.switchToHttp().getRequest<{ user?: JwtPayload & { workspaceId?: string } }>();
+      const request = context.switchToHttp().getRequest<{
+        user?: JwtPayload & { workspaceId?: string };
+        method?: string;
+      }>();
       const workspaceId = request.user?.workspaceId;
 
       if (!workspaceId) {
         throw new ForbiddenException('No workspace context in session.');
       }
 
-      const plan = await this.resolvePlan(workspaceId);
+      const { plan, status } = await this.getCachedSubscription(workspaceId);
 
-      if (!planAllowsFeature(plan, featureKey)) {
+      if (status === 'cancelled') {
+        // Cancelled subscription → downgrade to starter for feature checks
+        if (!planAllowsFeature('starter', featureKey)) {
+          throw new ForbiddenException(
+            `Your plan (starter) does not include access to '${featureKey}'. Upgrade to unlock this feature.`,
+          );
+        }
+        return true;
+      }
+
+      if (status === 'past_due') {
+        const method = (request.method ?? 'GET').toUpperCase();
+        if (method !== 'GET') {
+          throw new HttpException(
+            { code: 'PAYMENT_REQUIRED', message: 'Update billing to continue' },
+            402,
+          );
+        }
+        // GET requests pass through; fall to plan feature check below
+      }
+
+      // status = 'active' | 'trialing' | 'past_due' (GET only)
+      if (!planAllowsFeature(plan as WorkspacePlan, featureKey)) {
         throw new ForbiddenException(
           `Your plan (${plan}) does not include access to '${featureKey}'. Upgrade to unlock this feature.`,
         );
@@ -85,33 +117,33 @@ export function PlanGuard(featureKey: string): Type<CanActivate> {
       return true;
     }
 
-    private async resolvePlan(workspaceId: string): Promise<WorkspacePlan> {
+    private async getCachedSubscription(workspaceId: string): Promise<CachedSubscription> {
       const redis = getRedis();
-      const cacheKey = CACHE_KEY(workspaceId);
+      const cacheKey = SUB_CACHE_KEY(workspaceId);
 
       try {
         const cached = await redis.get(cacheKey);
-        if (cached) return cached as WorkspacePlan;
+        if (cached) return JSON.parse(cached) as CachedSubscription;
       } catch {
         // Redis unavailable — fall through to DB
       }
 
-      const workspace = await this.workspaceRepo.findOne({
-        where: { id: workspaceId },
-        select: ['id', 'plan'],
+      const sub = await this.subRepo.findOne({
+        where: { workspaceId },
+        select: ['plan', 'status'],
       });
 
-      if (!workspace) {
-        throw new ForbiddenException('Workspace not found.');
-      }
+      const result: CachedSubscription = sub
+        ? { plan: sub.plan, status: sub.status }
+        : { plan: 'starter', status: 'active' };
 
       try {
-        await redis.set(cacheKey, workspace.plan, 'EX', REDIS_TTL_SECONDS);
+        await redis.set(cacheKey, JSON.stringify(result), 'EX', REDIS_TTL_SECONDS);
       } catch {
         // Cache write failure is non-fatal
       }
 
-      return workspace.plan;
+      return result;
     }
   }
 

@@ -35,6 +35,15 @@ const CUSTOMER_ID  = 'cus_test123';
 const PRICE_PRO    = 'price_pro_test';
 const SUB_ID       = 'sub_test123';
 
+// Silence ioredis connection attempts (Redis del is called in webhook handlers)
+jest.mock('ioredis', () => {
+  return jest.fn().mockImplementation(() => ({
+    get: jest.fn().mockResolvedValue(null),
+    set: jest.fn().mockResolvedValue('OK'),
+    del: jest.fn().mockResolvedValue(1),
+  }));
+});
+
 // StripeSDK is loaded via require('stripe') in the service — mock it
 jest.mock('stripe', () => {
   const mCheckout       = { sessions: { create: jest.fn() } };

@@ -8,6 +8,7 @@ import { InsightCard } from './entities/insight-card.entity';
 import { InAppNotification } from './entities/in-app-notification.entity';
 import { Workspace } from '../../workspaces/entities/workspace.entity';
 import { WorkspaceUser } from '../../workspaces/entities/workspace-user.entity';
+import { WorkspaceSubscription } from '../../billing/entities/workspace-subscription.entity';
 import { MailModule } from '../../../common/mail/mail.module';
 import { AuditModule } from '../../../common/audit/audit.module';
 import { NotificationsModule } from '../../../notifications/notifications.module';
@@ -21,6 +22,7 @@ import { AuthModule } from '../../auth/auth.module';
       InAppNotification,
       Workspace,
       WorkspaceUser,
+      WorkspaceSubscription,
     ]),
     MailModule,
     AuditModule,

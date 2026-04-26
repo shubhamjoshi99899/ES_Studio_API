@@ -31,6 +31,7 @@ Minimum required values for local boot:
 
 ```env
 PORT=5000
+APP_URL=http://localhost:3000
 FRONTEND_URL=http://localhost:3000
 JWT_SECRET=change-me-access-secret
 JWT_REFRESH_SECRET=change-me-refresh-secret
@@ -48,9 +49,10 @@ REDIS_TLS=false
 
 Optional values:
 
+- `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_CALLBACK_URL` for Google OAuth signup/login
 - `META_APP_ID`, `META_APP_SECRET` for Meta connect/sync endpoints
 - `BIGQUERY_PROJECT_ID`, `GOOGLE_APPLICATION_CREDENTIALS` for UTM analytics sync/query flows
-- `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM` for email report delivery
+- `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM` for email report delivery and signup verification emails
 
 ## 3. Start PostgreSQL and Redis
 
@@ -119,6 +121,30 @@ curl -X POST http://localhost:5000/api/auth/setup \
 
 Then log in through `/api/auth/login`.
 
+## Signup and onboarding flow
+
+The backend now also supports self-serve account creation:
+
+- `POST /api/auth/register`
+- `GET /api/auth/google`
+- `GET /api/auth/google/callback`
+- `GET /api/auth/verify-email?token=...`
+- `POST /api/auth/workspace/create`
+
+Frontend routes expected by the backend redirects:
+
+- `/signup`
+- `/login`
+- `/verify-email`
+- `/onboarding`
+- `/dashboard`
+
+Important routing contract:
+
+- no JWT: frontend should redirect to `/signup`
+- JWT with `workspaceId = null`: frontend should allow `/onboarding`
+- JWT with `workspaceId` set: frontend should redirect from `/onboarding` to `/dashboard`
+
 ## 8. Postman collection
 
 Use [postman.collection.json](/Users/shubhamjoshi/ES_Studio_API/postman.collection.json) to test the API surface.
@@ -126,8 +152,8 @@ Use [postman.collection.json](/Users/shubhamjoshi/ES_Studio_API/postman.collecti
 Important auth note:
 
 - The current login flow stores auth in cookies.
-- The Phase 1 ops endpoints also require a JWT payload that includes `workspaceId`.
-- The existing login flow does not yet attach `workspaceId`, so ops requests need a manually supplied workspace-aware cookie token until that gap is fixed.
+- Ops endpoints require a JWT payload that includes `workspaceId`.
+- Users without a workspace should complete `/api/auth/workspace/create` through the onboarding flow before accessing workspace-scoped APIs.
 
 ## Running Everything With Docker
 

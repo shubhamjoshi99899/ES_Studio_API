@@ -27,8 +27,13 @@ Shared infrastructure used across flows:
 ### Authentication model
 
 - `POST /api/auth/login` authenticates a user by email and password.
+- `POST /api/auth/register` creates a new user and sends a verification email.
+- `GET /api/auth/google` starts Google OAuth login/signup.
+- `GET /api/auth/google/callback` completes Google OAuth and redirects the browser to the frontend.
+- `GET /api/auth/verify-email?token=...` verifies a pending signup and redirects to onboarding.
 - The API writes `access_token` and `refresh_token` cookies.
 - `JwtAuthGuard` reads the `access_token` cookie on protected routes.
+- `EmailVerifiedGuard` blocks authenticated but unverified users on non-public routes.
 - The JWT payload includes:
   - `sub`
   - `email`
@@ -54,7 +59,64 @@ Shared infrastructure used across flows:
   - `automation`
 - Enterprise allows everything.
 
-## 3. Bootstrap Flow
+## 3. Self-Serve Signup and Workspace Onboarding Flow
+
+This is the default new-user path for the current auth stack.
+
+### Flow
+
+1. User opens the frontend signup page.
+2. User chooses one of:
+   - email/password via `POST /api/auth/register`
+   - Google OAuth via `GET /api/auth/google`
+3. Email signup stores the user with:
+   - `emailVerified=false`
+   - `verificationToken`
+   - `verificationTokenExpiresAt`
+4. Backend sends a verification email linking to `/verify-email?token=...`.
+5. `GET /api/auth/verify-email` verifies the token, writes an `access_token` cookie, and redirects to the frontend onboarding route.
+6. Google OAuth creates or resolves the user, writes an `access_token` cookie, and redirects:
+   - new user: `/onboarding`
+   - existing user with workspace: `/dashboard`
+7. Frontend onboarding submits `POST /api/auth/workspace/create`.
+8. Backend creates:
+   - `workspaces`
+   - `workspace_users`
+   - `workspace_subscriptions`
+9. Backend returns a workspace-aware JWT with `workspaceId` set.
+10. Frontend redirects to `/dashboard`.
+
+### Frontend routing contract
+
+- no JWT: redirect user to `/signup`
+- JWT with `workspaceId = null`: allow `/onboarding`
+- JWT with `workspaceId` set: redirect `/onboarding` to `/dashboard`
+
+### APIs involved
+
+- `POST /api/auth/register`
+- `GET /api/auth/google`
+- `GET /api/auth/google/callback`
+- `GET /api/auth/verify-email`
+- `POST /api/auth/workspace/create`
+
+### Tables involved
+
+- `users`
+- `workspaces`
+- `workspace_users`
+- `workspace_subscriptions`
+
+### Common failure cases
+
+- duplicate email:
+  - `POST /api/auth/register` returns conflict
+- slug taken:
+  - `POST /api/auth/workspace/create` returns `409`
+- invalid or expired verification token:
+  - `GET /api/auth/verify-email` redirects to the frontend login page with an error marker
+
+## 4. Bootstrap Flow
 
 This is the first flow needed before most others work.
 
@@ -89,7 +151,7 @@ This is the first flow needed before most others work.
 
 - Without a valid `workspace_users` row with `status='active'`, login can still succeed, but workspace-scoped APIs will not behave usefully.
 
-## 4. Meta Connection and Historical Sync Flow
+## 5. Meta Connection and Historical Sync Flow
 
 This flow connects Facebook Pages and Instagram accounts, stores them, and queues initial historical sync work.
 
@@ -142,7 +204,7 @@ This flow connects Facebook Pages and Instagram accounts, stores them, and queue
   - demographics deleted
   - Facebook revenue and revenue mappings deleted
 
-## 5. Meta Analytics Read Flow
+## 6. Meta Analytics Read Flow
 
 This flow reads already-synced Meta analytics and returns dashboard/report data.
 
@@ -188,7 +250,7 @@ This means the flow is:
 3. queue repair sync in background
 4. return current best response immediately
 
-## 6. UTM Analytics Flow
+## 7. UTM Analytics Flow
 
 This flow handles site/session analytics coming from BigQuery or imported CSV data.
 
@@ -222,7 +284,7 @@ This flow handles site/session analytics coming from BigQuery or imported CSV da
 - BigQuery is the upstream source for sync flows.
 - CSV import is the fallback/manual ingestion path.
 
-## 7. Revenue and Page Mapping Flow
+## 8. Revenue and Page Mapping Flow
 
 This flow translates raw page/platform identifiers into business-facing team/category reporting.
 
@@ -678,4 +740,3 @@ If someone new is trying to understand the product from the API layer, the best 
 6. inbox
 7. billing
 8. reporting
-

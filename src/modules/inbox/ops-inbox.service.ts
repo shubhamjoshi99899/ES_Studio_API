@@ -1,11 +1,12 @@
 import {
+  ForbiddenException,
   Inject,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import type { FindOptionsWhere } from 'typeorm';
-import { Repository } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
 import { AuditService } from '../../common/audit/audit.service';
 import type { IPlatformInboxAdapter } from './adapters/platform-adapter.interface';
 import { InboxContact } from './entities/inbox-contact.entity';
@@ -31,6 +32,7 @@ export class OpsInboxService {
     private readonly auditService: AuditService,
     @Inject('INBOX_ADAPTERS')
     private readonly inboxAdapters: IPlatformInboxAdapter[],
+    private readonly dataSource: DataSource,
   ) {}
 
   async getThreads(
@@ -125,6 +127,8 @@ export class OpsInboxService {
     savedPendingMessage.externalMessageId = result.externalMessageId;
     const saved = await this.messageRepo.save(savedPendingMessage);
 
+    await this.threadRepo.update({ id: thread.id }, { lastMessageAt: new Date() });
+
     await this.auditService.log({
       workspaceId,
       actorId: null,
@@ -141,31 +145,45 @@ export class OpsInboxService {
     workspaceId: string,
     threadId: string,
     dto: CreateNoteDto,
-  ): Promise<Partial<InboxNote>> {
+    actorId: string,
+  ): Promise<InboxNote> {
     const thread = await this.getThreadOrFail(workspaceId, threadId);
+
+    // Resolve workspace_users.id from the JWT user id + workspace context
+    const [wuRow] = await this.dataSource.query<Array<{ id: string }>>(
+      `SELECT id FROM workspace_users
+       WHERE user_id = $1 AND workspace_id = $2 AND status = 'active'
+       LIMIT 1`,
+      [actorId, workspaceId],
+    );
+    if (!wuRow) {
+      throw new ForbiddenException('User is not an active member of this workspace.');
+    }
 
     const note = this.noteRepo.create({
       workspaceId,
       threadId: thread.id,
+      authorId: wuRow.id,
       body: dto.body,
-    } as Partial<InboxNote>);
+    });
+    const saved = await this.noteRepo.save(note);
 
     await this.auditService.log({
       workspaceId,
-      actorId: null,
+      actorId: wuRow.id,
       action: 'inbox_note.create',
       entityType: 'inbox_note',
-      entityId: null,
+      entityId: saved.id,
       payload: { threadId: thread.id, body: dto.body },
     });
 
-    return note;
+    return saved;
   }
 
   async getContacts(workspaceId: string): Promise<InboxContact[]> {
     return this.contactRepo.find({
       where: { workspaceId },
-      order: { updatedAt: 'DESC' },
+      order: { createdAt: 'DESC' },
     });
   }
 

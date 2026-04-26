@@ -9,6 +9,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { WorkspaceId } from '../../common/decorators/workspace-id.decorator';
+import { CurrentUserId } from '../../common/decorators/current-user-id.decorator';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { PlanGuard } from '../../guards/plan.guard';
 import { CreateNoteDto } from './dto/create-note.dto';
@@ -69,8 +70,9 @@ export class OpsInboxController {
     @WorkspaceId() workspaceId: string,
     @Param('id') id: string,
     @Body() dto: CreateNoteDto,
+    @CurrentUserId() actorId: string,
   ): Promise<any> {
-    return this.opsInboxService.createNote(workspaceId, id, dto);
+    return this.opsInboxService.createNote(workspaceId, id, dto, actorId);
   }
 
   @Get('contacts')

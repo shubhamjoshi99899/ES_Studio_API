@@ -66,9 +66,11 @@ Path: `src/modules/auth`
 Responsibilities:
 
 - admin user setup
-- login/logout
-- cookie-based auth
-- global API guard registration
+- email/password login
+- self-serve registration and email verification
+- Google OAuth login/signup
+- workspace-aware JWT issuance
+- cookie-based auth and guard registration
 
 Key files:
 
@@ -76,14 +78,18 @@ Key files:
 - `auth.controller.ts`
 - `auth.service.ts`
 - `entities/user.entity.ts`
-- `src/common/guards/api-key.guard.ts`
+- `src/common/guards/jwt-auth.guard.ts`
+- `src/guards/email-verified.guard.ts`
 
 Current behavior:
 
-- the guard is registered globally using `APP_GUARD`
-- auth relies on a persistent `apiKey` stored on the `users` table
-- the `auth_token` cookie is matched directly against that DB token
-- public routes are allowed through the `@Public()` decorator
+- `JwtAuthGuard` is registered globally using `APP_GUARD`
+- `EmailVerifiedGuard` is also registered globally and skips `@Public()` routes
+- auth uses cookie-based JWTs instead of the earlier API-key pattern
+- the `access_token` cookie carries `sub`, `email`, and `workspaceId`
+- `POST /api/auth/register` creates unverified users and sends verification email
+- `GET /api/auth/google` and `/api/auth/google/callback` handle OAuth signup/login
+- `POST /api/auth/workspace/create` creates the first workspace and returns a workspace-aware token
 
 ### 2. Facebook Module
 

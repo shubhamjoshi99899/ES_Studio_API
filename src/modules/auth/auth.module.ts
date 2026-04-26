@@ -10,6 +10,7 @@ import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { SetupGuard } from '../../common/guards/setup.guard';
+import { GoogleOAuthConfigGuard } from './google-oauth-config.guard';
 import { GoogleStrategy } from './strategies/google.strategy';
 import { MailModule } from '../../common/mail/mail.module';
 import { WorkspacesModule } from '../workspaces/workspaces.module';
@@ -38,6 +39,7 @@ import { WorkspacesModule } from '../workspaces/workspaces.module';
   providers: [
     AuthService,
     SetupGuard,
+    GoogleOAuthConfigGuard,
     GoogleStrategy,
 
     // Global JWT guard replaces the old ApiKeyGuard

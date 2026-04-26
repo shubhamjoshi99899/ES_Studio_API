@@ -11,6 +11,7 @@ import { InboxMessage } from './entities/inbox-message.entity';
 import { InboxNote } from './entities/inbox-note.entity';
 import { PlatformConnection } from './entities/platform-connection.entity';
 import { Workspace } from '../workspaces/entities/workspace.entity';
+import { WorkspaceSubscription } from '../billing/entities/workspace-subscription.entity';
 
 import { MetaFacebookAdapter } from './adapters/meta-facebook.adapter';
 import { MetaInstagramAdapter } from './adapters/meta-instagram.adapter';
@@ -31,6 +32,7 @@ import { OpsInboxController } from './ops-inbox.controller';
       InboxNote,
       PlatformConnection,
       Workspace,
+      WorkspaceSubscription,
     ]),
     AuditModule,
     BullModule.registerQueue({ name: 'inbox-poll' }),

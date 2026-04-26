@@ -10,6 +10,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
+import Redis from 'ioredis';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const StripeSDK = require('stripe');
 
@@ -82,6 +83,20 @@ export class StripeService {
   private readonly logger = new Logger(StripeService.name);
   // Instance-level cache so each service instance starts clean (important for tests)
   private readonly planCache = new Map<string, PlanCacheEntry>();
+  private _redis: Redis | null = null;
+
+  private get redis(): Redis {
+    if (!this._redis) {
+      this._redis = new Redis({
+        host:     this.config.get<string>('REDIS_HOST')     || 'localhost',
+        port:     parseInt(this.config.get<string>('REDIS_PORT') || '6379', 10),
+        password: this.config.get<string>('REDIS_PASSWORD') || undefined,
+        tls:      this.config.get<string>('REDIS_TLS') === 'true' ? {} : undefined,
+        lazyConnect: true,
+      });
+    }
+    return this._redis;
+  }
 
   constructor(
     private readonly config: ConfigService,
@@ -187,6 +202,9 @@ export class StripeService {
 
     await this.workspaceRepo.update({ id: workspaceId }, { plan });
     this.planCache.delete(workspaceId);
+    await this.redis.del('sub:' + workspaceId).catch((e: Error) =>
+      this.logger.warn(`Redis sub cache invalidation failed: ${e.message}`),
+    );
   }
 
   private async onSubscriptionUpdated(sub: StripeSubscription): Promise<void> {
@@ -209,6 +227,9 @@ export class StripeService {
 
     await this.workspaceRepo.update({ id: workspaceId }, { plan });
     this.planCache.delete(workspaceId);
+    await this.redis.del('sub:' + workspaceId).catch((e: Error) =>
+      this.logger.warn(`Redis sub cache invalidation failed: ${e.message}`),
+    );
   }
 
   private async onSubscriptionDeleted(sub: StripeSubscription): Promise<void> {
@@ -218,6 +239,9 @@ export class StripeService {
     await this.subRepo.update({ workspaceId }, { status: 'cancelled', plan: 'starter' });
     await this.workspaceRepo.update({ id: workspaceId }, { plan: 'starter' });
     this.planCache.delete(workspaceId);
+    await this.redis.del('sub:' + workspaceId).catch((e: Error) =>
+      this.logger.warn(`Redis sub cache invalidation failed: ${e.message}`),
+    );
   }
 
   private async onPaymentFailed(invoice: StripeInvoice): Promise<void> {
@@ -226,6 +250,9 @@ export class StripeService {
 
     await this.subRepo.update({ workspaceId }, { status: 'past_due' });
     this.planCache.delete(workspaceId);
+    await this.redis.del('sub:' + workspaceId).catch((e: Error) =>
+      this.logger.warn(`Redis sub cache invalidation failed: ${e.message}`),
+    );
 
     // Email all workspace admins
     const admins = await this.workspaceUserRepo.find({
