@@ -8,6 +8,7 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
+import { ApiTags } from '@nestjs/swagger';
 import { WorkspaceId } from '../../common/decorators/workspace-id.decorator';
 import { CurrentUserId } from '../../common/decorators/current-user-id.decorator';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -19,6 +20,7 @@ import { UpdateThreadDto } from './dto/update-thread.dto';
 import { OpsInboxService } from './ops-inbox.service';
 
 @Controller('api/ops/inbox')
+@ApiTags('inbox')
 @UseGuards(JwtAuthGuard, PlanGuard('inbox'))
 export class OpsInboxController {
   constructor(private readonly opsInboxService: OpsInboxService) {}

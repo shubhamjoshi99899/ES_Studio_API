@@ -9,6 +9,7 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
+import { ApiTags } from '@nestjs/swagger';
 import { WorkspaceId } from '../../../common/decorators/workspace-id.decorator';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { PlanGuard } from '../../../guards/plan.guard';
@@ -18,6 +19,7 @@ import { CreateAlertRuleDto } from './dto/create-alert-rule.dto';
 import { UpdateAlertRuleDto } from './dto/update-alert-rule.dto';
 
 @Controller('api/ops')
+@ApiTags('alerts')
 @UseGuards(JwtAuthGuard, OnboardingGuard, PlanGuard('alerts'))
 export class OpsAlertsController {
   constructor(private readonly opsAlertsService: OpsAlertsService) {}

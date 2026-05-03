@@ -64,6 +64,7 @@ export class MailService implements OnModuleInit {
           </div>
         `,
       });
+      this.logger.log(`Email sent: invite → ${to}`);
     } catch (error) {
       this.logger.error(`Failed to send invite email to ${to}: ${this.getErrorMessage(error)}`);
     }
@@ -79,6 +80,7 @@ export class MailService implements OnModuleInit {
         from: this.getFromAddress(),
         ...options,
       });
+      this.logger.log(`Email sent: custom → ${options.to}`);
     } catch (error) {
       this.logger.error(`Failed to send email to ${options.to}: ${this.getErrorMessage(error)}`);
     }
@@ -106,9 +108,41 @@ export class MailService implements OnModuleInit {
           </div>
         `,
       });
+      this.logger.log(`Email sent: verify-email → ${to}`);
     } catch (error) {
       this.logger.error(
         `Failed to send verification email to ${to}: ${this.getErrorMessage(error)}`,
+      );
+    }
+  }
+
+  async sendPasswordReset(to: string, token: string): Promise<void> {
+    try {
+      if (!this.transporter) {
+        this.logger.warn(`Password reset email skipped for ${to}: SMTP transporter is not configured`);
+        return;
+      }
+
+      const appUrl = this.configService.get<string>('APP_URL') ?? 'http://localhost:3000';
+      const resetUrl = `${appUrl}/reset-password?token=${encodeURIComponent(token)}`;
+
+      await this.transporter.sendMail({
+        from: this.getFromAddress(),
+        to,
+        subject: 'Reset your SocialMetrics password',
+        html: `
+          <div style="font-family:Arial,sans-serif;line-height:1.5;color:#111827">
+            <h2>Reset your password</h2>
+            <p>Click the link below to reset your SocialMetrics password.</p>
+            <p><a href="${resetUrl}">Reset your password</a></p>
+            <p>This link expires in 1 hour.</p>
+          </div>
+        `,
+      });
+      this.logger.log(`Email sent: password-reset → ${to}`);
+    } catch (error) {
+      this.logger.error(
+        `Failed to send password reset email to ${to}: ${this.getErrorMessage(error)}`,
       );
     }
   }
@@ -126,6 +160,7 @@ export class MailService implements OnModuleInit {
         subject: `SocialMetrics alert: ${alertName}`,
         text: metricSummary,
       });
+      this.logger.log(`Email sent: alert → ${to}`);
     } catch (error) {
       this.logger.error(`Failed to send alert email to ${to}: ${this.getErrorMessage(error)}`);
     }

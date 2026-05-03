@@ -8,12 +8,14 @@ import {
   Post,
   UseGuards,
 } from '@nestjs/common';
+import { ApiTags } from '@nestjs/swagger';
 import { WorkspaceId } from '../../../common/decorators/workspace-id.decorator';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { OnboardingGuard } from '../../../guards/onboarding.guard';
 import { OpsCampaignsService } from './ops-campaigns.service';
 
 @Controller('api/ops/campaigns')
+@ApiTags('campaigns')
 @UseGuards(JwtAuthGuard, OnboardingGuard)
 export class OpsCampaignsController {
   constructor(private readonly opsCampaignsService: OpsCampaignsService) {}

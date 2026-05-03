@@ -34,6 +34,12 @@ export class User {
   @Column({ name: 'verification_token_expires_at', type: 'timestamp', nullable: true })
   verificationTokenExpiresAt: Date | null;
 
+  @Column({ name: 'reset_token', type: 'text', unique: true, nullable: true })
+  resetToken: string | null;
+
+  @Column({ name: 'reset_token_expires_at', type: 'timestamp', nullable: true })
+  resetTokenExpiresAt: Date | null;
+
   @Column({ type: 'text', nullable: true })
   name: string | null;
 

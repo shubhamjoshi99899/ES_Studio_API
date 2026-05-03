@@ -1,5 +1,6 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import express from 'express';
 import { AppModule } from './app.module';
 import cookieParser from 'cookie-parser';
@@ -25,16 +26,20 @@ async function bootstrap() {
   app.use(cookieParser());
   app.use(compression({ threshold: 1024 })); // Compress responses > 1KB
 
-  // Health check — no auth required, used by Docker HEALTHCHECK
-  app.use('/health', (_req: any, res: any) => {
-    res.status(200).json({ status: 'ok' });
-  });
-
   const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
   app.enableCors({
     origin: frontendUrl === '*' ? true : frontendUrl,
     credentials: true,
   });
+
+  const config = new DocumentBuilder()
+    .setTitle('SocialMetrics API')
+    .setDescription('SocialMetrics SaaS platform API — Phases 1-4')
+    .setVersion('1.0')
+    .addCookieAuth('access_token')
+    .build();
+  const document = SwaggerModule.createDocument(app, config);
+  SwaggerModule.setup('api/docs', app, document);
 
   await app.listen(process.env.PORT ?? 9000);
 }

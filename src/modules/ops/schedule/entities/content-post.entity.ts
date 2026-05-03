@@ -16,6 +16,7 @@ export type ContentPostStatus =
   | 'review'
   | 'approved'
   | 'scheduled'
+  | 'publishing'
   | 'published'
   | 'failed';
 
@@ -69,7 +70,7 @@ export class ContentPost {
 
   @Column({
     type: 'enum',
-    enum: ['draft', 'review', 'approved', 'scheduled', 'published', 'failed'],
+    enum: ['draft', 'review', 'approved', 'scheduled', 'publishing', 'published', 'failed'],
     default: 'draft',
   })
   status: ContentPostStatus;

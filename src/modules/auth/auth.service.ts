@@ -4,6 +4,7 @@ import {
   ForbiddenException,
   ConflictException,
   BadRequestException,
+  GoneException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
@@ -20,6 +21,10 @@ export interface JwtPayload {
   email: string;
   workspaceId: string | null;
 }
+
+const FORGOT_PASSWORD_MESSAGE = 'If that email exists you will receive a reset link';
+const RESET_PASSWORD_MESSAGE = 'Password updated — please log in again';
+const RESEND_VERIFICATION_MESSAGE = 'Verification email sent';
 
 @Injectable()
 export class AuthService {
@@ -234,7 +239,8 @@ export class AuthService {
   // ── Register ──────────────────────────────────────────────────────────────
 
   async register(dto: RegisterDto): Promise<{ message: string }> {
-    const existing = await this.userRepo.findOne({ where: { email: dto.email } });
+    const normalizedEmail = dto.email.toLowerCase().trim();
+    const existing = await this.userRepo.findOne({ where: { email: normalizedEmail } });
     if (existing) throw new ConflictException('An account with this email already exists');
 
     const passwordHash = await bcrypt.hash(dto.password, 12);
@@ -242,7 +248,7 @@ export class AuthService {
     const verificationTokenExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
     const user = this.userRepo.create({
-      email: dto.email,
+      email: normalizedEmail,
       passwordHash,
       emailVerified: false,
       verificationToken,
@@ -250,9 +256,96 @@ export class AuthService {
     });
     await this.userRepo.save(user);
 
-    await this.mailService.sendVerification(dto.email, verificationToken);
+    await this.mailService.sendVerification(normalizedEmail, verificationToken);
 
     return { message: 'Check your email to verify your account' };
+  }
+
+  async forgotPassword(email: string): Promise<{ message: string }> {
+    const normalizedEmail = email.toLowerCase().trim();
+    const user = await this.userRepo.findOne({ where: { email: normalizedEmail } });
+    if (!user) {
+      return { message: FORGOT_PASSWORD_MESSAGE };
+    }
+
+    const rawToken = crypto.randomBytes(32).toString('hex');
+    const resetToken = await bcrypt.hash(rawToken, 10);
+    const resetTokenExpiresAt = new Date(Date.now() + 60 * 60 * 1000);
+
+    await this.userRepo.update(user.id, {
+      resetToken,
+      resetTokenExpiresAt,
+    });
+
+    await this.mailService.sendPasswordReset(normalizedEmail, rawToken);
+
+    return { message: FORGOT_PASSWORD_MESSAGE };
+  }
+
+  async resetPassword(token: string, newPassword: string): Promise<{ message: string }> {
+    const users = await this.userRepo
+      .createQueryBuilder('user')
+      .where('user.reset_token IS NOT NULL')
+      .getMany();
+
+    let matchedUser: User | null = null;
+
+    for (const user of users) {
+      if (!user.resetToken) {
+        continue;
+      }
+
+      const isMatch = await bcrypt.compare(token, user.resetToken);
+      if (isMatch) {
+        matchedUser = user;
+        break;
+      }
+    }
+
+    if (!matchedUser) {
+      throw new BadRequestException('Invalid reset token');
+    }
+
+    if (!matchedUser.resetTokenExpiresAt || matchedUser.resetTokenExpiresAt <= new Date()) {
+      throw new GoneException('Reset token has expired');
+    }
+
+    const passwordHash = await bcrypt.hash(newPassword, 12);
+
+    await this.userRepo.update(matchedUser.id, {
+      passwordHash,
+      resetToken: null,
+      resetTokenExpiresAt: null,
+    });
+
+    await this.sessionRepo
+      .createQueryBuilder()
+      .update()
+      .set({ revokedAt: new Date() })
+      .where('"user_id" = :userId AND "revoked_at" IS NULL', { userId: matchedUser.id })
+      .execute();
+
+    return { message: RESET_PASSWORD_MESSAGE };
+  }
+
+  async resendVerification(email: string): Promise<{ message: string }> {
+    const normalizedEmail = email.toLowerCase().trim();
+    const user = await this.userRepo.findOne({ where: { email: normalizedEmail } });
+    if (!user || user.emailVerified) {
+      return { message: RESEND_VERIFICATION_MESSAGE };
+    }
+
+    const verificationToken = crypto.randomBytes(32).toString('hex');
+    const verificationTokenExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+
+    await this.userRepo.update(user.id, {
+      verificationToken,
+      verificationTokenExpiresAt,
+    });
+
+    await this.mailService.sendVerification(normalizedEmail, verificationToken);
+
+    return { message: RESEND_VERIFICATION_MESSAGE };
   }
 
   // ── Verify email ──────────────────────────────────────────────────────────

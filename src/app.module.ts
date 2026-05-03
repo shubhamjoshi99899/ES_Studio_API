@@ -5,6 +5,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { BullModule } from '@nestjs/bull';
 import { ScheduleModule } from '@nestjs/schedule';
 import { EventEmitterModule } from '@nestjs/event-emitter';
+import { AppController } from './app.controller';
 import { FacebookModule } from './modules/facebook/facebook.module';
 import { PostStatusChangedListener } from './listeners/post-status-changed.listener';
 import { PageMappingsModule } from './modules/page-mappings/page-mappings.module';
@@ -16,11 +17,13 @@ import { EmailReportsModule } from './modules/email-reports/email-reports.module
 import { OpsTeamModule } from './modules/ops/team/ops-team.module';
 import { OpsScheduleModule } from './modules/ops/schedule/ops-schedule.module';
 import { OpsCampaignsModule } from './modules/ops/campaigns/ops-campaigns.module';
+import { OpsConnectionsModule } from './modules/ops/connections/ops-connections.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { OpsAlertsModule } from './modules/ops/alerts/ops-alerts.module';
 import { InAppNotification } from './modules/ops/alerts/entities/in-app-notification.entity';
 import { InboxModule } from './modules/inbox/inbox.module';
 import { BillingModule } from './modules/billing/billing.module';
+import { PublishModule } from './modules/publish/publish.module';
 import { User } from './modules/auth/entities/user.entity';
 import { EmailVerifiedGuard } from './guards/email-verified.guard';
 
@@ -61,12 +64,14 @@ import { EmailVerifiedGuard } from './guards/email-verified.guard';
     OpsTeamModule,
     OpsScheduleModule,
     OpsCampaignsModule,
+    OpsConnectionsModule,
     NotificationsModule,
     OpsAlertsModule,
     InboxModule,
     BillingModule,
+    PublishModule,
   ],
-  controllers: [],
+  controllers: [AppController],
   providers: [
     PostStatusChangedListener,
     {

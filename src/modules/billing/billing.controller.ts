@@ -7,6 +7,7 @@ import {
   Post,
   Req,
 } from '@nestjs/common';
+import { ApiTags } from '@nestjs/swagger';
 import type { RawBodyRequest } from '@nestjs/common';
 import type { Request } from 'express';
 import { Public } from '../../common/decorators/public.decorator';
@@ -20,6 +21,7 @@ class CreateCheckoutDto {
 }
 
 @Controller('api/billing')
+@ApiTags('billing')
 export class BillingController {
   constructor(private readonly stripeService: StripeService) {}
 
